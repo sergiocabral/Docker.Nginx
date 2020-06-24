@@ -2,6 +2,8 @@ FROM alpine:latest
 
 RUN    apk update \
     && apk add bash \
+    && apk add gettext \
+    && apk add apache2-utils \
     && apk add nginx \
     && apk add certbot \
     && rm -rf /var/cache/apk/*
