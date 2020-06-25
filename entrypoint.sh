@@ -92,8 +92,6 @@ printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
 
-printf "Configuring reverse proxy based on the environment variables.\n";
-
 INDEX_HOST=1;
 while [ ! -z "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
 do
@@ -112,16 +110,17 @@ do
     AUTH_USERS=();
     AUTH_PASSWORDS=();
     
-    printf "HOST $INDEX_HOST:\n";
-    printf " - Url:            $URL\n";
+    printf "Configuring reverse proxy for host $INDEX_HOST.\n";
+    printf "\n";
+    printf "    Url:            $URL\n";
     
-    printf " - Let's Encrypt:  $SSL_ENABLE\n";
+    printf "    Let's Encrypt:  $SSL_ENABLE\n";
     if [ "$SSL_ENABLE" = true ];
     then
-        printf "   - Email:        $SSL_EMAIL\n";
+        printf "    - Email:        $SSL_EMAIL\n";
     fi
     
-    printf " - Authentication: $AUTH_ENABLE\n";
+    printf "    Authentication: $AUTH_ENABLE\n";
     if [ "$AUTH_ENABLE" = true ];
     then
         INDEX_USER=0;
@@ -138,12 +137,21 @@ do
             AUTH_PASSWORDS+=($PASS);
 
             PADDING=$( test $INDEX_USER -lt 10 && echo " ");
-            printf "   - User $INDEX_USER:$PADDING      $USER\n";
+            printf "    - User $INDEX_USER:$PADDING      $USER\n";
         done
     fi
 
+    printf "\n";
+    printf "Doing.\n";
+    printf "Done.\n";
+
     INDEX_HOST=$((INDEX_HOST + 1));
 done
+
+if [ "$INDEX_HOST" = 1 ];
+then
+    printf "No reverse proxy settings were found on the environment variables.\n";
+fi
 
 printf "Starting nginx.\n";
 
