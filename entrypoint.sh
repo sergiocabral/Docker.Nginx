@@ -97,6 +97,11 @@ while [ ! -z "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
 do
     VAR_NAME="HOST${INDEX_HOST}_URL";
     URL=${!VAR_NAME};
+
+    printf "Configuring reverse proxy for HOST$INDEX_HOST ($URL).\n";
+
+    VAR_NAME="HOST${INDEX_HOST}_SERVER";
+    SERVER=${!VAR_NAME};
     
     VAR_NAME="HOST${INDEX_HOST}_SSL_EMAIL";
     SSL_EMAIL=${!VAR_NAME};
@@ -109,41 +114,83 @@ do
 
     AUTH_USERS=();
     AUTH_PASSWORDS=();
-    
-    printf "Configuring reverse proxy for host $INDEX_HOST.\n";
-    printf "\n";
-    printf "    Url:            $URL\n";
-    
-    printf "    Let's Encrypt:  $SSL_ENABLE\n";
-    if [ "$SSL_ENABLE" = true ];
+
+    readarray -t SERVER_PARTS < <($DIR_SCRIPTS/split-to-lines.sh ":" "$SERVER:");
+    SERVER_NAME=${SERVER_PARTS[0]};
+    SERVER_PORT=${SERVER_PARTS[1]};
+
+    CAN_CONFIGURE=true;
+
+    if [ -z "$SERVER_NAME" ] || [ -z "$SERVER_PORT" ];
     then
-        printf "    - Email:        $SSL_EMAIL\n";
-    fi
-    
-    printf "    Authentication: $AUTH_ENABLE\n";
-    if [ "$AUTH_ENABLE" = true ];
-    then
-        INDEX_USER=0;
-        readarray -t AUTH_LIST < <($DIR_SCRIPTS/split-to-lines.sh "," $AUTH_INFO);    
-        for AUTH in ${AUTH_LIST[@]};
-        do
-            INDEX_USER=$((INDEX_USER + 1));
-            readarray -t USER_PASS < <($DIR_SCRIPTS/split-to-lines.sh "=" $AUTH);
-
-            USER=${USER_PASS[0]};
-            PASS=${USER_PASS[1]};
-
-            AUTH_USERS+=($USER);
-            AUTH_PASSWORDS+=($PASS);
-
-            PADDING=$( test $INDEX_USER -lt 10 && echo " ");
-            printf "    - User $INDEX_USER:$PADDING      $USER\n";
-        done
+        printf "The address and port of the service was not informed.\n";
+        printf "Set variable as: HOST${INDEX_HOST}_SERVER=<server name>:<port number>\n";
+        CAN_CONFIGURE=false;
     fi
 
-    printf "\n";
-    printf "Doing.\n";
-    printf "Done.\n";
+    if [ "$CAN_CONFIGURE" = true ];
+    then
+        printf "\n";
+        
+        printf "    Url:            $URL\n";
+        printf "    Server name:    $SERVER_NAME\n";
+        printf "    Server port:    $SERVER_PORT\n";
+        printf "    Let's Encrypt:  $SSL_ENABLE\n";
+        if [ "$SSL_ENABLE" = true ];
+        then
+            printf "    - Email:        $SSL_EMAIL\n";
+        fi
+        
+        printf "    Authentication: $AUTH_ENABLE\n";
+        if [ "$AUTH_ENABLE" = true ];
+        then
+            INDEX_USER=0;
+            readarray -t AUTH_LIST < <($DIR_SCRIPTS/split-to-lines.sh "," $AUTH_INFO);    
+            for AUTH in ${AUTH_LIST[@]};
+            do
+                INDEX_USER=$((INDEX_USER + 1));
+                readarray -t USER_PASS < <($DIR_SCRIPTS/split-to-lines.sh "=" $AUTH);
+
+                USER=${USER_PASS[0]};
+                PASS=${USER_PASS[1]};
+
+                AUTH_USERS+=($USER);
+                AUTH_PASSWORDS+=($PASS);
+
+                PADDING=$( test $INDEX_USER -lt 10 && echo " ");
+                printf "    - User $INDEX_USER:$PADDING      $USER\n";
+            done
+        fi
+        printf "\n";
+
+        FILE_CONF="$DIR_CONF_D/$URL.conf";
+        touch $FILE_CONF;
+        truncate -s 0 $FILE_CONF;
+        chmod +x $FILE_CONF;
+        
+        echo "server {" >> $FILE_CONF;
+        echo "    listen                                 80;" >> $FILE_CONF;
+        echo "    listen                                 [::]:80;" >> $FILE_CONF;
+        echo "    server_name                            $URL;" >> $FILE_CONF;        
+        echo "    location / {" >> $FILE_CONF;
+        echo "        proxy_pass                         http://$SERVER_NAME:$SERVER_PORT;" >> $FILE_CONF;
+        echo "        proxy_http_version                 1.1;" >> $FILE_CONF;
+        echo "        proxy_cache_bypass                 \$http_upgrade;" >> $FILE_CONF;
+        echo "        proxy_set_header Upgrade           \$http_upgrade;" >> $FILE_CONF;
+        echo "        proxy_set_header Connection        \"upgrade\";" >> $FILE_CONF;
+        echo "        proxy_set_header Host              \$host;" >> $FILE_CONF;
+        echo "        proxy_set_header X-Real-IP         \$remote_addr;" >> $FILE_CONF;
+        echo "        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;" >> $FILE_CONF;
+        echo "        proxy_set_header X-Forwarded-Proto \$scheme;" >> $FILE_CONF;
+        echo "        proxy_set_header X-Forwarded-Host  \$host;" >> $FILE_CONF;
+        echo "        proxy_set_header X-Forwarded-Port  \$server_port;" >> $FILE_CONF;
+        echo "    }" >> $FILE_CONF;
+        echo "}" >> $FILE_CONF;
+        
+        printf "Configuration file created: $FILE_CONF\n";
+    else
+        printf "Configuration aborted.\n";
+    fi
 
     INDEX_HOST=$((INDEX_HOST + 1));
 done
