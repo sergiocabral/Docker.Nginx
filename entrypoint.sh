@@ -93,7 +93,7 @@ printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
 
 INDEX_HOST=1;
-while [ ! -z "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
+while [ -n "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
 do
     VAR_NAME="HOST${INDEX_HOST}_URL";
     URL=${!VAR_NAME};
@@ -109,8 +109,8 @@ do
     VAR_NAME="HOST${INDEX_HOST}_AUTH";
     AUTH_INFO=${!VAR_NAME};
 
-    SSL_ENABLE=$( (test ! -z "$SSL_EMAIL" && echo true) || echo false )
-    AUTH_ENABLE=$( (test ! -z "$AUTH_INFO" && echo true) || echo false );
+    SSL_ENABLE=$( (test -n "$SSL_EMAIL" && echo true) || echo false )
+    AUTH_ENABLE=$( (test -n "$AUTH_INFO" && echo true) || echo false );
 
     AUTH_USERS=();
     AUTH_PASSWORDS=();
@@ -188,6 +188,25 @@ do
         echo "}" >> $FILE_CONF;
         
         printf "Configuration file created: $FILE_CONF\n";
+
+        FILE_PASSWD="$FILE_CONF.htpasswd";
+        rm -f $FILE_PASSWD;
+        if [ -n "${AUTH_USERS[0]}" ];
+        then
+            printf "Configuring access control.\n";
+            
+            touch $FILE_PASSWD;
+            
+            INDEX_AUTH=0;
+            for AUTH_USER in "${AUTH_USERS[@]}"
+            do
+                AUTH_PASS=${AUTH_PASSWORDS[$INDEX_AUTH]};
+                echo "$AUTH_PASS" | htpasswd -i $FILE_PASSWD "$AUTH_USER";
+            done
+        else
+            printf "No access control configured.\n";
+        fi
+
     else
         printf "Configuration aborted.\n";
     fi
