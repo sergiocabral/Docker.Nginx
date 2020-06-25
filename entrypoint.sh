@@ -342,5 +342,3 @@ printf "Starting nginx.\n";
 $NGINX_EXECUTABLE -s stop;
 sleep 1;
 $NGINX_EXECUTABLE -g "daemon off;" ${NGINX_ARGS};
-
-sleep infinity;
