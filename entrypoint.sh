@@ -51,7 +51,9 @@ then
     DIR="/run/nginx";       mkdir -p $DIR && chmod -R 755 $DIR && chown -R $USER:$USER $DIR;
 
     $NGINX_EXECUTABLE;
+    sleep 1;
     $NGINX_EXECUTABLE -s stop;
+    sleep 1;
 
     printf "Configuring directories.\n";
 
@@ -94,4 +96,6 @@ printf "Starting nginx.\n";
 
 $NGINX_EXECUTABLE ${NGINX_ARGS};
 
-sleep infinity
+printf "Waiting infinitely.\n";
+
+sleep infinity;
