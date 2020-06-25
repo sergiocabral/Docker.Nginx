@@ -92,6 +92,38 @@ printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
 
+printf "Configuring reverse proxy of hosts.\n";
+
+
+INDEX=1;
+while [ ! -z "$(VAR_NAME="HOST${INDEX}_URL"; echo "${!VAR_NAME}")" ];
+do
+    VAR_NAME="HOST${INDEX}_URL";
+    URL=${!VAR_NAME};
+
+    VAR_NAME="HOST${INDEX}_SSL_EMAIL";
+    SSL_EMAIL=${!VAR_NAME};
+
+    VAR_NAME="HOST${INDEX}_AUTH";
+    AUTH_INFO=${!VAR_NAME};
+
+    SSL_ENABLE=$( (test ! -z "$SSL_EMAIL" && echo true) || echo false )
+    AUTH_ENABLE=$( (test ! -z "$AUTH_INFO" && echo true) || echo false );
+
+    printf "HOST $INDEX:\n";
+    printf " - Url:            $URL\n";
+    printf " - Let's Encrypt:  $SSL_ENABLE\n";
+    if [ "$SSL_ENABLE" = true ];
+    then
+        printf "   - Email:        $SSL_EMAIL\n";
+    fi
+    printf " - Authentication: $AUTH_ENABLE\n";
+
+    # TODO: Implementar...
+
+    INDEX=$((INDEX + 1));
+done
+
 printf "Starting nginx.\n";
 
 $NGINX_EXECUTABLE -g "daemon off;" ${NGINX_ARGS};
