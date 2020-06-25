@@ -47,8 +47,8 @@ then
 
     USER=root;
 
-    DIR="/var/log/nginx";   mkdir -p $DIR && chmod -R 755 $DIR && chown -R $USER:$USER $DIR;
-    DIR="/run/nginx";       mkdir -p $DIR && chmod -R 755 $DIR && chown -R $USER:$USER $DIR;
+    DIR="/var/log/nginx";   mkdir -p $DIR && chown -R $USER:$USER $DIR;
+    DIR="/run/nginx";       mkdir -p $DIR && chown -R $USER:$USER $DIR;
 
     $NGINX_EXECUTABLE;
     sleep 1;
@@ -79,9 +79,9 @@ then
 
     printf "Configured directories:\n";
 
-    chmod -R 755 $DIR_CONF_BACKUP       && chown -R $USER:$USER $DIR_CONF_BACKUP;
-    chmod -R 755 $DIR_CONF_DOCKER       && chown -R $USER:$USER $DIR_CONF_DOCKER;
-    chmod -R 755 $DIR_CONF_D_TEMPLATES  && chown -R $USER:$USER $DIR_CONF_D_TEMPLATES;
+    chown -R $USER:$USER $DIR_CONF_BACKUP;
+    chown -R $USER:$USER $DIR_CONF_DOCKER;
+    chown -R $USER:$USER $DIR_CONF_D_TEMPLATES;
     
     $LS -d $DIR_CONF $DIR_CONF_BACKUP $DIR_CONF_DOCKER $DIR_CONF_D_TEMPLATES;
 else
@@ -184,14 +184,13 @@ do
             do
                 AUTH_PASS=${AUTH_PASSWORDS[$INDEX_AUTH]};
                 echo "$AUTH_PASS" | htpasswd -i $FILE_PASSWD "$AUTH_USER";
+                INDEX_AUTH=$((INDEX_AUTH + 1));
             done
         else
             printf "No access control configured.\n";
         fi
 
         touch $FILE_CONF;
-        chown root:nginx $FILE_CONF;
-        chmod 770 $FILE_CONF;
         
         echo "server {" >> $FILE_CONF;
         echo "    listen                                 80;" >> $FILE_CONF;
