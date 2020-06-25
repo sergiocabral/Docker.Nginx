@@ -94,8 +94,4 @@ $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_
 
 printf "Starting nginx.\n";
 
-$NGINX_EXECUTABLE ${NGINX_ARGS};
-
-printf "Waiting infinitely.\n";
-
-sleep infinity;
+$NGINX_EXECUTABLE -g "daemon off;" ${NGINX_ARGS};
