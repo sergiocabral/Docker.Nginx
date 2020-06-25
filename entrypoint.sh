@@ -92,36 +92,57 @@ printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
 
-printf "Configuring reverse proxy of hosts.\n";
+printf "Configuring reverse proxy based on the environment variables.\n";
 
-
-INDEX=1;
-while [ ! -z "$(VAR_NAME="HOST${INDEX}_URL"; echo "${!VAR_NAME}")" ];
+INDEX_HOST=1;
+while [ ! -z "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
 do
-    VAR_NAME="HOST${INDEX}_URL";
+    VAR_NAME="HOST${INDEX_HOST}_URL";
     URL=${!VAR_NAME};
-
-    VAR_NAME="HOST${INDEX}_SSL_EMAIL";
+    
+    VAR_NAME="HOST${INDEX_HOST}_SSL_EMAIL";
     SSL_EMAIL=${!VAR_NAME};
 
-    VAR_NAME="HOST${INDEX}_AUTH";
+    VAR_NAME="HOST${INDEX_HOST}_AUTH";
     AUTH_INFO=${!VAR_NAME};
 
     SSL_ENABLE=$( (test ! -z "$SSL_EMAIL" && echo true) || echo false )
     AUTH_ENABLE=$( (test ! -z "$AUTH_INFO" && echo true) || echo false );
 
-    printf "HOST $INDEX:\n";
+    AUTH_USERS=();
+    AUTH_PASSWORDS=();
+    
+    printf "HOST $INDEX_HOST:\n";
     printf " - Url:            $URL\n";
+    
     printf " - Let's Encrypt:  $SSL_ENABLE\n";
     if [ "$SSL_ENABLE" = true ];
     then
         printf "   - Email:        $SSL_EMAIL\n";
     fi
+    
     printf " - Authentication: $AUTH_ENABLE\n";
+    if [ "$AUTH_ENABLE" = true ];
+    then
+        INDEX_USER=0;
+        readarray -t AUTH_LIST < <($DIR_SCRIPTS/split-to-lines.sh "," $AUTH_INFO);    
+        for AUTH in ${AUTH_LIST[@]};
+        do
+            INDEX_USER=$((INDEX_USER + 1));
+            readarray -t USER_PASS < <($DIR_SCRIPTS/split-to-lines.sh "=" $AUTH);
 
-    # TODO: Implementar...
+            USER=${USER_PASS[0]};
+            PASS=${USER_PASS[1]};
 
-    INDEX=$((INDEX + 1));
+            AUTH_USERS+=($USER);
+            AUTH_PASSWORDS+=($PASS);
+
+            PADDING=$( test $INDEX_USER -lt 10 && echo " ");
+            printf "   - User $INDEX_USER:$PADDING      $USER\n";
+        done
+    fi
+
+    INDEX_HOST=$((INDEX_HOST + 1));
 done
 
 printf "Starting nginx.\n";
