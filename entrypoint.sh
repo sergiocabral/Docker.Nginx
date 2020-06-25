@@ -21,8 +21,9 @@ printf "Entrypoint for docker image: nginx\n";
 # Variables to configure externally.
 NGINX_ARGS="$* $NGINX_ARGS";
 
-NGINX_EXECUTABLE=$(which nginx || echo "");
 NGINX_USER="nginx";
+NGINX_EXECUTABLE=$(which nginx || echo "");
+CERTBOT_EXECUTABLE=$(which certbot || echo "");
 SUFFIX_TEMPLATE=".template";
 DIR_CONF="/etc/nginx";
 DIR_CONF_BACKUP="$DIR_CONF.original";
@@ -31,11 +32,19 @@ DIR_CONF_D="$DIR_CONF/conf.d";
 DIR_CONF_D_TEMPLATES="$DIR_CONF.templates";
 DIR_CERTIFICATES="$DIR_CONF.certificates";
 DIR_SCRIPTS="${DIR_SCRIPTS:-/root}";
+DIR_CERTBOT_CERTIFICATES="/etc/letsencrypt/live";
+DIR_CERTBOT_WEBROOT="/tmp/letsencrypt";
 LS="ls --color=auto -CFl";
 
 if [ ! -e "$NGINX_EXECUTABLE" ];
 then
     printf "Nginx is not installed.\n" >> /dev/stderr;
+    exit 1;
+fi
+
+if [ ! -e "$CERTBOT_EXECUTABLE" ];
+then
+    printf "Certbot is not installed.\n" >> /dev/stderr;
     exit 1;
 fi
 
@@ -188,32 +197,52 @@ do
         rm -f $FILE_CONF;
         rm -f $FILE_PASSWD;
 
+        DIR_CERTIFICATES_HOST="$DIR_CERTIFICATES/${URLS[0]}";
+        DIR_CERTIFICATES_HOST_FULLCHAIN="$DIR_CERTIFICATES_HOST/fullchain.pem";
+        DIR_CERTIFICATES_HOST_PRIVKEY="$DIR_CERTIFICATES_HOST/privkey.pem";
+
         if [ "$SSL_ENABLE" = true ];
         then
-            # $DIR_CERTIFICATES;
-            # $SSL_EMAIL
+            if [ ! -s "$DIR_CERTIFICATES_HOST_FULLCHAIN" ] || [ ! -s "$DIR_CERTIFICATES_HOST_PRIVKEY" ];
+            then
 
-            printf "Requesting certificate to Let's Encrypt.\n";
+                printf "Requesting certificate to Let's Encrypt.\n";
 
-            touch $FILE_CONF;
-            DIR_WWW="/tmp/letsencrypt";
-            mkdir -p $DIR_WWW;
-            chmod -R 777 $DIR_WWW;
-            
-            echo "server {" >> $FILE_CONF;
-            echo "    listen                       80;" >> $FILE_CONF;
-            echo "    listen                       [::]:80;" >> $FILE_CONF;
-            echo "    server_name                  $URLS_ALL;" >> $FILE_CONF;        
-            echo "    location / {" >> $FILE_CONF;
-            echo "        root                     $DIR_WWW;" >> $FILE_CONF;
-            echo "    }" >> $FILE_CONF;
-            echo "}" >> $FILE_CONF;
+                touch $FILE_CONF;
+                mkdir -p $DIR_CERTBOT_WEBROOT;
+                chmod -R 777 $DIR_CERTBOT_WEBROOT;
+                
+                echo "server {" >> $FILE_CONF;
+                echo "    listen                       80;" >> $FILE_CONF;
+                echo "    listen                       [::]:80;" >> $FILE_CONF;
+                echo "    server_name                  $URLS_ALL;" >> $FILE_CONF;        
+                echo "    location / {" >> $FILE_CONF;
+                echo "        root                     $DIR_CERTBOT_WEBROOT;" >> $FILE_CONF;
+                echo "    }" >> $FILE_CONF;
+                echo "}" >> $FILE_CONF;
 
-            $NGINX_EXECUTABLE -s reload;
-            sleep 1;
+                $NGINX_EXECUTABLE -s reload;
+                sleep 1;
 
-            #TODO rm -R $DIR_WWW;
-            rm -f $FILE_CONF;
+                CERTBOT_ARG_DOMAINS=$(IFS="§"; echo "${URLS[*]}");
+                CERTBOT_ARG_DOMAINS="-d ${CERTBOT_ARG_DOMAINS/§/" -d "}";
+                CERTBOT_ARG="certonly -n --agree-tos --webroot -w $DIR_CERTBOT_WEBROOT -m $SSL_EMAIL --cert-name ${URLS[0]} $CERTBOT_ARG_DOMAINS";
+                CERTBOT_COMMAND="$CERTBOT_EXECUTABLE $CERTBOT_ARG";
+                printf "$CERTBOT_COMMAND\n";
+                $CERTBOT_COMMAND;
+
+                DIR_CERTIFICATES_CERTBOT="$DIR_CERTBOT_CERTIFICATES/${URLS[0]}";
+                mkdir -p $DIR_CERTIFICATES_HOST;
+                cp $DIR_CERTIFICATES_CERTBOT/* $DIR_CERTIFICATES_HOST/;
+
+                rm -R $DIR_CERTBOT_WEBROOT;
+                rm -f $FILE_CONF;
+
+                printf "Certificates files created:\n";
+            else
+                printf "Certificates files already exist:\n";
+            fi
+            $LS -d $DIR_CERTIFICATES_HOST/*;
         fi
 
         if [ "$AUTH_ENABLE" = true ];
@@ -237,10 +266,31 @@ do
 
         touch $FILE_CONF;
         
+        if [ "$SSL_ENABLE" = true ];
+        then
+            echo "server {" >> $FILE_CONF;
+            echo "    listen                                 80;" >> $FILE_CONF;
+            echo "    listen                                 [::]:80;" >> $FILE_CONF;
+            echo "    server_name                            $URLS_ALL;" >> $FILE_CONF;
+            echo "    return                                 301 https://\$host\$request_uri;" >> $FILE_CONF;
+            echo "}" >> $FILE_CONF;
+            echo "" >> $FILE_CONF;
+        fi
+
         echo "server {" >> $FILE_CONF;
-        echo "    listen                                 80;" >> $FILE_CONF;
-        echo "    listen                                 [::]:80;" >> $FILE_CONF;
+
+        if [ "$SSL_ENABLE" = true ];
+        then
+            echo "    listen                                 443 ssl;" >> $FILE_CONF;
+            echo "    listen                                 [::]:443 ssl;" >> $FILE_CONF;
+        else
+            echo "    listen                                 80;" >> $FILE_CONF;
+            echo "    listen                                 [::]:80;" >> $FILE_CONF;
+        fi
+
         echo "    server_name                            $URLS_ALL;" >> $FILE_CONF;
+        echo "" >> $FILE_CONF;
+
         echo "    location / {" >> $FILE_CONF;
         echo "        proxy_pass                         http://$SERVER_NAME:$SERVER_PORT;" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
@@ -263,7 +313,15 @@ do
         echo "        proxy_set_header X-Forwarded-Host  \$host;" >> $FILE_CONF;
         echo "        proxy_set_header X-Forwarded-Port  \$server_port;" >> $FILE_CONF;
         echo "    }" >> $FILE_CONF;
+
+        if [ "$SSL_ENABLE" = true ];
+        then
+            echo "" >> $FILE_CONF;
+            echo "    ssl_certificate                        $DIR_CERTIFICATES_HOST_FULLCHAIN;" >> $FILE_CONF;
+            echo "    ssl_certificate_key                    $DIR_CERTIFICATES_HOST_PRIVKEY;" >> $FILE_CONF;
+        fi
         echo "}" >> $FILE_CONF;
+        echo "" >> $FILE_CONF;
 
         printf "Configuration file created: $FILE_CONF\n";
 
