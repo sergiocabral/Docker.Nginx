@@ -160,13 +160,38 @@ do
                 PADDING=$( test $INDEX_USER -lt 10 && echo " ");
                 printf "    - User $INDEX_USER:$PADDING      $USER\n";
             done
+
+            AUTH_ENABLE=$( (test -n "${AUTH_USERS[0]}" && echo true) || echo false );
         fi
         printf "\n";
 
         FILE_CONF="$DIR_CONF_D/$URL.conf";
+        FILE_PASSWD="$FILE_CONF.htpasswd";
+
+        rm -f $FILE_CONF;
+        rm -f $FILE_PASSWD;
+
+        if [ "$AUTH_ENABLE" = true ];
+        then
+            printf "Configuring access control.\n";
+            
+            touch $FILE_PASSWD;
+            chown root:nginx $FILE_PASSWD;
+            chmod 640 $FILE_PASSWD;
+
+            INDEX_AUTH=0;
+            for AUTH_USER in "${AUTH_USERS[@]}"
+            do
+                AUTH_PASS=${AUTH_PASSWORDS[$INDEX_AUTH]};
+                echo "$AUTH_PASS" | htpasswd -i $FILE_PASSWD "$AUTH_USER";
+            done
+        else
+            printf "No access control configured.\n";
+        fi
+
         touch $FILE_CONF;
-        truncate -s 0 $FILE_CONF;
-        chmod +x $FILE_CONF;
+        chown root:nginx $FILE_CONF;
+        chmod 770 $FILE_CONF;
         
         echo "server {" >> $FILE_CONF;
         echo "    listen                                 80;" >> $FILE_CONF;
@@ -174,6 +199,15 @@ do
         echo "    server_name                            $URL;" >> $FILE_CONF;        
         echo "    location / {" >> $FILE_CONF;
         echo "        proxy_pass                         http://$SERVER_NAME:$SERVER_PORT;" >> $FILE_CONF;
+        echo "" >> $FILE_CONF;
+
+        if [ "$AUTH_ENABLE" = true ];
+        then
+            echo "        auth_basic                         \"Enter your access credentials to enter $URL\";" >> $FILE_CONF;
+            echo "        auth_basic_user_file               $FILE_PASSWD;" >> $FILE_CONF;
+            echo "" >> $FILE_CONF;
+        fi
+
         echo "        proxy_http_version                 1.1;" >> $FILE_CONF;
         echo "        proxy_cache_bypass                 \$http_upgrade;" >> $FILE_CONF;
         echo "        proxy_set_header Upgrade           \$http_upgrade;" >> $FILE_CONF;
@@ -186,26 +220,8 @@ do
         echo "        proxy_set_header X-Forwarded-Port  \$server_port;" >> $FILE_CONF;
         echo "    }" >> $FILE_CONF;
         echo "}" >> $FILE_CONF;
-        
-        printf "Configuration file created: $FILE_CONF\n";
 
-        FILE_PASSWD="$FILE_CONF.htpasswd";
-        rm -f $FILE_PASSWD;
-        if [ -n "${AUTH_USERS[0]}" ];
-        then
-            printf "Configuring access control.\n";
-            
-            touch $FILE_PASSWD;
-            
-            INDEX_AUTH=0;
-            for AUTH_USER in "${AUTH_USERS[@]}"
-            do
-                AUTH_PASS=${AUTH_PASSWORDS[$INDEX_AUTH]};
-                echo "$AUTH_PASS" | htpasswd -i $FILE_PASSWD "$AUTH_USER";
-            done
-        else
-            printf "No access control configured.\n";
-        fi
+        printf "Configuration file created: $FILE_CONF\n";
 
     else
         printf "Configuration aborted.\n";
