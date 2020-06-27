@@ -56,7 +56,7 @@ then
     
     printf "Running nginx for the first time.\n";
 
-    USER=root;
+    USER=nginx;
 
     DIR="/var/log/nginx";   mkdir -p $DIR && chown -R $USER:$USER $DIR;
     DIR="/run/nginx";       mkdir -p $DIR && chown -R $USER:$USER $DIR;
