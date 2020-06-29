@@ -110,7 +110,6 @@ INDEX_HOST=1;
 while [ -n "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
 do
     VAR_NAME="HOST${INDEX_HOST}_URL";
-    VAR_NAME="HOST${INDEX_HOST}_URL";
     URLS_ALL=${!VAR_NAME};
     readarray -t URLS < <($DIR_SCRIPTS/split-to-lines.sh " " "$URLS_ALL");
 
@@ -155,7 +154,7 @@ do
         do
             INDEX_URL=$((INDEX_URL + 1));
 
-            PADDING=$( test $INDEX_URL -lt 10 && echo " ");
+            PADDING=$( test $INDEX_URL -lt 10 && echo " " || echo "");
             printf "    - Url $INDEX_URL:$PADDING       $URL\n";
         done
 
@@ -183,7 +182,7 @@ do
                 AUTH_USERS+=($USER);
                 AUTH_PASSWORDS+=($PASS);
 
-                PADDING=$( test $INDEX_USER -lt 10 && echo " ");
+                PADDING=$( test $INDEX_USER -lt 10 && echo " " || echo "");
                 printf "    - User $INDEX_USER:$PADDING      $USER\n";
             done
 
