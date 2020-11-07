@@ -34,6 +34,8 @@ DIR_CERTIFICATES="$DIR_CONF.certificates";
 DIR_CERTIFICATES_DEFAULT="$DIR_CERTIFICATES/default_server";
 FILE_CERTIFICATE_DEFAULT="$DIR_CERTIFICATES_DEFAULT/autosigned";
 DIR_SCRIPTS="${DIR_SCRIPTS:-/root}";
+DIR_SITES="/home";
+DIR_SITES_ROOT="www";
 DIR_CERTBOT_CERTIFICATES="/etc/letsencrypt/live";
 DIR_CERTBOT_WEBROOT="/tmp/letsencrypt";
 LS="ls --color=auto -CFl";
@@ -156,9 +158,9 @@ do
     URLS_ALL=${!VAR_NAME};
     readarray -t URLS < <($DIR_SCRIPTS/split-to-lines.sh " " "$URLS_ALL");
 
-    printf "Configuring reverse proxy for HOST$INDEX_HOST (${URLS[0]}).\n";
+    printf "Configuring HOST$INDEX_HOST (${URLS[0]}).\n";
 
-    VAR_NAME="HOST${INDEX_HOST}_SERVER";
+    VAR_NAME="HOST${INDEX_HOST}_LOCATION";
     SERVER=${!VAR_NAME};
     
     VAR_NAME="HOST${INDEX_HOST}_SSL_EMAIL";
@@ -174,16 +176,26 @@ do
     AUTH_PASSWORDS=();
 
     readarray -t SERVER_PARTS < <($DIR_SCRIPTS/split-to-lines.sh ":" "$SERVER:");
+    SITE_NAME="";
     SERVER_NAME=${SERVER_PARTS[0]};
-    SERVER_PORT=${SERVER_PARTS[1]};
+    SERVER_PORT=${SERVER_PARTS[1]};    
 
     CAN_CONFIGURE=true;
 
     if [ -z "$SERVER_NAME" ] || [ -z "$SERVER_PORT" ];
     then
-        printf "The address and port of the service was not informed.\n";
-        printf "Set variable as: HOST${INDEX_HOST}_SERVER=<server name>:<port number>\n";
-        CAN_CONFIGURE=false;
+        SITE_REGEX="^[\w\.-_]+$";
+        if [[ "${SERVER}" =~ ${pattern} ]];
+        then
+            SITE_NAME="$SERVER";
+            SITE_LOCATION="$DIR_SITES/$SITE_NAME/$DIR_SITES_ROOT";
+        else
+            printf "The directory name or address and port of the service was not informed.\n";
+            printf "Set variable to one of the two below:\n";
+            printf "  HOST${INDEX_HOST}_LOCATION=<directory name>\n";
+            printf "  HOST${INDEX_HOST}_LOCATION=<server name>:<port number>\n";
+            CAN_CONFIGURE=false;
+        fi
     fi
 
     if [ "$CAN_CONFIGURE" = true ];
@@ -201,8 +213,17 @@ do
             printf "    - Url $INDEX_URL:$PADDING       $URL\n";
         done
 
-        printf "    Server name:    $SERVER_NAME\n";
-        printf "    Server port:    $SERVER_PORT\n";
+        if [ -n "$SITE_NAME" ];
+        then
+            printf "    Site\n";
+            printf "    - Name:         $SITE_NAME\n";
+            printf "    - Root path:    $SITE_LOCATION\n";
+        else
+            printf "    Reverse proxy\n";
+            printf "    - Server name:  $SERVER_NAME\n";
+            printf "    - Server port:  $SERVER_PORT\n";
+        fi
+
         printf "    Let's Encrypt:  $SSL_ENABLE\n";
         if [ "$SSL_ENABLE" = true ];
         then
@@ -333,28 +354,38 @@ do
         echo "    server_name                            $URLS_ALL;" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
 
-        echo "    location / {" >> $FILE_CONF;
-        echo "        proxy_pass                         http://$SERVER_NAME:$SERVER_PORT;" >> $FILE_CONF;
-        echo "" >> $FILE_CONF;
-
-        if [ "$AUTH_ENABLE" = true ];
+        if [ -n "$SITE_NAME" ];
         then
-            echo "        auth_basic                         \"Enter your access credentials to enter ${URLS[0]}\";" >> $FILE_CONF;
-            echo "        auth_basic_user_file               $FILE_PASSWD;" >> $FILE_CONF;
+            echo "    root                                   $SITE_LOCATION;" >> $FILE_CONF;
+            if [ ! -d "$SITE_LOCATION" ];
+            then
+                mkdir -p $SITE_LOCATION;
+                echo $SITE_NAME > "$SITE_LOCATION/index.html";
+            fi
+        else
+            echo "    location / {" >> $FILE_CONF;
+            echo "        proxy_pass                         http://$SERVER_NAME:$SERVER_PORT;" >> $FILE_CONF;
             echo "" >> $FILE_CONF;
-        fi
 
-        echo "        proxy_http_version                 1.1;" >> $FILE_CONF;
-        echo "        proxy_cache_bypass                 \$http_upgrade;" >> $FILE_CONF;
-        echo "        proxy_set_header Upgrade           \$http_upgrade;" >> $FILE_CONF;
-        echo "        proxy_set_header Connection        \"upgrade\";" >> $FILE_CONF;
-        echo "        proxy_set_header Host              \$host;" >> $FILE_CONF;
-        echo "        proxy_set_header X-Real-IP         \$remote_addr;" >> $FILE_CONF;
-        echo "        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;" >> $FILE_CONF;
-        echo "        proxy_set_header X-Forwarded-Proto \$scheme;" >> $FILE_CONF;
-        echo "        proxy_set_header X-Forwarded-Host  \$host;" >> $FILE_CONF;
-        echo "        proxy_set_header X-Forwarded-Port  \$server_port;" >> $FILE_CONF;
-        echo "    }" >> $FILE_CONF;
+            if [ "$AUTH_ENABLE" = true ];
+            then
+                echo "        auth_basic                         \"Enter your access credentials to enter ${URLS[0]}\";" >> $FILE_CONF;
+                echo "        auth_basic_user_file               $FILE_PASSWD;" >> $FILE_CONF;
+                echo "" >> $FILE_CONF;
+            fi
+
+            echo "        proxy_http_version                 1.1;" >> $FILE_CONF;
+            echo "        proxy_cache_bypass                 \$http_upgrade;" >> $FILE_CONF;
+            echo "        proxy_set_header Upgrade           \$http_upgrade;" >> $FILE_CONF;
+            echo "        proxy_set_header Connection        \"upgrade\";" >> $FILE_CONF;
+            echo "        proxy_set_header Host              \$host;" >> $FILE_CONF;
+            echo "        proxy_set_header X-Real-IP         \$remote_addr;" >> $FILE_CONF;
+            echo "        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;" >> $FILE_CONF;
+            echo "        proxy_set_header X-Forwarded-Proto \$scheme;" >> $FILE_CONF;
+            echo "        proxy_set_header X-Forwarded-Host  \$host;" >> $FILE_CONF;
+            echo "        proxy_set_header X-Forwarded-Port  \$server_port;" >> $FILE_CONF;
+            echo "    }" >> $FILE_CONF;
+        fi
 
         if [ "$SSL_ENABLE" = true ];
         then
