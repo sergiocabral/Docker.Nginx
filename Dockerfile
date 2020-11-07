@@ -5,6 +5,7 @@ RUN apk add --no-cache \
 	gettext \
 	apache2-utils \
 	certbot \
+	openssl \
 	nginx
 
 COPY ./scripts/bash/split-to-lines.sh /root/

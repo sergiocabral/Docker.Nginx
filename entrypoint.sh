@@ -31,6 +31,8 @@ DIR_CONF_DOCKER="$DIR_CONF.conf";
 DIR_CONF_D="$DIR_CONF/conf.d";
 DIR_CONF_D_TEMPLATES="$DIR_CONF.templates";
 DIR_CERTIFICATES="$DIR_CONF.certificates";
+DIR_CERTIFICATES_DEFAULT="$DIR_CERTIFICATES/default_server";
+FILE_CERTIFICATE_DEFAULT="$DIR_CERTIFICATES_DEFAULT/autosigned";
 DIR_SCRIPTS="${DIR_SCRIPTS:-/root}";
 DIR_CERTBOT_CERTIFICATES="/etc/letsencrypt/live";
 DIR_CERTBOT_WEBROOT="/tmp/letsencrypt";
@@ -73,18 +75,30 @@ then
     rm -R $DIR_CONF;
     ln -s $DIR_CONF_DOCKER $DIR_CONF;
 
-    mkdir -p $DIR_CONF_D_TEMPLATES;    
+    mkdir -p $DIR_CONF_D_TEMPLATES;
 
     if [ -d "$DIR_CONF_D_TEMPLATES" ] && [ ! -z "$(ls -A $DIR_CONF_D_TEMPLATES)" ];
     then
         printf "Warning: The $DIR_CONF_D_TEMPLATES directory already existed and will not have its content overwritten.\n";
     else
-        printf "Creating file templates in $DIR_CONF_D_TEMPLATES\n";
+        printf "Creating files templates in $DIR_CONF_D_TEMPLATES\n";
 
         cp -R $DIR_CONF_D/* $DIR_CONF_D_TEMPLATES;
         ls -1 $DIR_CONF_D_TEMPLATES | \
            grep -v $SUFFIX_TEMPLATE | \
-           xargs -I {} mv $DIR_CONF_D_TEMPLATES/{} $DIR_CONF_D_TEMPLATES/{}$SUFFIX_TEMPLATE;    
+           xargs -I {} mv $DIR_CONF_D_TEMPLATES/{} $DIR_CONF_D_TEMPLATES/{}$SUFFIX_TEMPLATE;
+
+        FILE_CONF="$DIR_CONF_D_TEMPLATES/default.conf$SUFFIX_TEMPLATE";
+        printf "Adjusting default configuration file template: $(basename $FILE_CONF)\n";
+        echo "" >> $FILE_CONF;
+        echo "server {" >> $FILE_CONF;
+        echo "    listen              443 ssl;" >> $FILE_CONF;
+        echo "    listen              [::]:443 ssl;" >> $FILE_CONF;
+        echo "    ssl_certificate     $FILE_CERTIFICATE_DEFAULT.crt;" >> $FILE_CONF;
+        echo "    ssl_certificate_key $FILE_CERTIFICATE_DEFAULT.key;" >> $FILE_CONF;
+        echo "    return              301 http://\$host\$request_uri;" >> $FILE_CONF;
+        echo "}" >> $FILE_CONF;
+
     fi
     $LS -Ad $DIR_CONF_D_TEMPLATES/*;
 
@@ -105,6 +119,35 @@ fi
 printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF_D directory with replacement of environment variables with their values.\n";
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
+
+DIR_CERTIFICATES_HOST="$DIR_CERTIFICATES_DEFAULT";
+DIR_CERTIFICATES_HOST_FULLCHAIN="$FILE_CERTIFICATE_DEFAULT.crt";
+DIR_CERTIFICATES_HOST_PRIVKEY="$FILE_CERTIFICATE_DEFAULT.key";
+
+if [ ! -s "$DIR_CERTIFICATES_HOST_FULLCHAIN" ] || [ ! -s "$DIR_CERTIFICATES_HOST_PRIVKEY" ];
+then
+
+    printf "Creating auto-signed certificate to default site.\n";
+
+    mkdir -p $DIR_CERTIFICATES_HOST;
+    rm -Rf $DIR_CERTIFICATES_HOST_FULLCHAIN;
+    rm -Rf $DIR_CERTIFICATES_HOST_PRIVKEY;
+
+    openssl \
+        req \
+        -x509 \
+        -nodes \
+        -days 365 \
+        -newkey rsa:2048 \
+        -keyout "$DIR_CERTIFICATES_HOST_PRIVKEY" \
+        -out "$DIR_CERTIFICATES_HOST_FULLCHAIN" \
+        -subj "/C=/ST=/L=/O=/CN=";
+
+    printf "Auto-signed certificate files created:\n";
+else
+    printf "Auto-signed certificate files already exist:\n";
+fi
+$LS -d $DIR_CERTIFICATES_HOST/*;
 
 INDEX_HOST=1;
 while [ -n "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
