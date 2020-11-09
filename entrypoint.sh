@@ -384,6 +384,13 @@ do
             echo "    index                                  index.html index.htm index.php;" >> $FILE_CONF;
             echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
 
+            if [ "$AUTH_ENABLE" = true ];
+            then
+                echo "    auth_basic                             \"Enter your access credentials to enter ${URLS[0]}\";" >> $FILE_CONF;
+                echo "    auth_basic_user_file                   $FILE_PASSWD;" >> $FILE_CONF;
+                echo "" >> $FILE_CONF;
+            fi
+
             for SITE in ${SITES[@]};
             do
                 readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
