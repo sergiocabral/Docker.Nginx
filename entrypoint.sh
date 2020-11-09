@@ -25,17 +25,20 @@ NGINX_USER="nginx";
 NGINX_EXECUTABLE=$(which nginx || echo "");
 CERTBOT_EXECUTABLE=$(which certbot || echo "");
 SUFFIX_TEMPLATE=".template";
+PREFIX_SITE="site-";
+DEFAULT_SERVER_NAME="default_server";
 DIR_CONF="/etc/nginx";
 DIR_CONF_BACKUP="$DIR_CONF.original";
 DIR_CONF_DOCKER="$DIR_CONF.conf";
 DIR_CONF_D="$DIR_CONF/conf.d";
 DIR_CONF_D_TEMPLATES="$DIR_CONF.templates";
 DIR_CERTIFICATES="$DIR_CONF.certificates";
-DIR_CERTIFICATES_DEFAULT="$DIR_CERTIFICATES/default_server";
+DIR_CERTIFICATES_DEFAULT="$DIR_CERTIFICATES/$DEFAULT_SERVER_NAME";
 FILE_CERTIFICATE_DEFAULT="$DIR_CERTIFICATES_DEFAULT/autosigned";
 DIR_SCRIPTS="${DIR_SCRIPTS:-/root}";
 DIR_SITES="/home";
 DIR_SITES_ROOT="www";
+DIR_DEFAULT_SERVER="$DIR_SITES/$DEFAULT_SERVER_NAME";
 DIR_CERTBOT_CERTIFICATES="/etc/letsencrypt/live";
 DIR_CERTBOT_WEBROOT="/tmp/letsencrypt";
 LS="ls --color=auto -CFl";
@@ -88,6 +91,7 @@ then
         cp -R $DIR_CONF_D/* $DIR_CONF_D_TEMPLATES;
         ls -1 $DIR_CONF_D_TEMPLATES | \
            grep -v $SUFFIX_TEMPLATE | \
+           grep -v $PREFIX_SITE | \
            xargs -I {} mv $DIR_CONF_D_TEMPLATES/{} $DIR_CONF_D_TEMPLATES/{}$SUFFIX_TEMPLATE;
 
         FILE_CONF="$DIR_CONF_D_TEMPLATES/default.conf$SUFFIX_TEMPLATE";
@@ -176,7 +180,7 @@ do
     AUTH_PASSWORDS=();
 
     readarray -t SERVER_PARTS < <($DIR_SCRIPTS/split-to-lines.sh ":" "$SERVER:");
-    SITE_NAME="";
+    SITES="";
     SERVER_NAME=${SERVER_PARTS[0]};
     SERVER_PORT=${SERVER_PARTS[1]};    
 
@@ -184,18 +188,27 @@ do
 
     if [ -z "$SERVER_NAME" ] || [ -z "$SERVER_PORT" ];
     then
-        SITE_REGEX="^[\w\.-_]+$";
-        if [[ "${SERVER}" =~ ${pattern} ]];
-        then
-            SITE_NAME="$SERVER";
-            SITE_LOCATION="$DIR_SITES/$SITE_NAME/$DIR_SITES_ROOT";
-        else
-            printf "The directory name or address and port of the service was not informed.\n";
-            printf "Set variable to one of the two below:\n";
-            printf "  HOST${INDEX_HOST}_LOCATION=<directory name>\n";
-            printf "  HOST${INDEX_HOST}_LOCATION=<server name>:<port number>\n";
-            CAN_CONFIGURE=false;
-        fi
+        readarray -t SITES < <($DIR_SCRIPTS/split-to-lines.sh "," "$SERVER,");
+
+        SITE_REGEX="^[a-zA-Z0-9\.-_]+(|/php[57])$";
+        for SITE in ${SITES[@]};
+        do
+            if [ ! -z "$SITE" ] && [[ ! "${SITE}" =~ ${SITE_REGEX} ]];
+            then
+                printf "INVALID SITE VALUE: $SITE\n";
+                CAN_CONFIGURE=false;
+                break;
+            fi
+        done
+    fi
+
+    if [ "$CAN_CONFIGURE" = false ];
+    then
+        printf "The directory name or address and port of the service was not informed.\n";
+        printf "For directory name you can use PHP version as \"/php5\" or \"/php7\" (default).\n";
+        printf "Set variable to one of the two below:\n";
+        printf "  HOST${INDEX_HOST}_LOCATION=<directory1>/php5,<directory2>/php7,<directory3>,<directory4>\n";
+        printf "  HOST${INDEX_HOST}_LOCATION=<server name>:<port number>\n";
     fi
 
     if [ "$CAN_CONFIGURE" = true ];
@@ -213,11 +226,17 @@ do
             printf "    - Url $INDEX_URL:$PADDING       $URL\n";
         done
 
-        if [ -n "$SITE_NAME" ];
+        if [ ! -z "${SITES[0]}" ];
         then
-            printf "    Site\n";
-            printf "    - Name:         $SITE_NAME\n";
-            printf "    - Root path:    $SITE_LOCATION\n";
+            INDEX_SITE=0;
+            for SITE in ${SITES[@]};
+            do
+                INDEX_SITE=$((INDEX_SITE + 1));
+                readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
+                printf "    Site $INDEX_SITE\n";
+                printf "    - Directory:    ${SITE_PARTS[0]}\n";
+                printf "    - PHP version:  $( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 )\n";
+            done
         else
             printf "    Reverse proxy\n";
             printf "    - Server name:  $SERVER_NAME\n";
@@ -254,7 +273,7 @@ do
         fi
         printf "\n";
 
-        FILE_CONF="$DIR_CONF_D/${URLS[0]}.conf";
+        FILE_CONF="$DIR_CONF_D/$PREFIX_SITE${URLS[0]}.conf";
         FILE_PASSWD="$FILE_CONF.htpasswd";
 
         rm -f $FILE_CONF;
@@ -354,14 +373,41 @@ do
         echo "    server_name                            $URLS_ALL;" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
 
-        if [ -n "$SITE_NAME" ];
+        if [ -n "${SITES[0]}" ];
         then
-            echo "    root                                   $SITE_LOCATION;" >> $FILE_CONF;
-            if [ ! -d "$SITE_LOCATION" ];
+            if [ ! -d "$DIR_DEFAULT_SERVER" ];
             then
-                mkdir -p $SITE_LOCATION;
-                echo $SITE_NAME > "$SITE_LOCATION/index.html";
+                mkdir -p $DIR_DEFAULT_SERVER;
+                echo "" > "$DIR_DEFAULT_SERVER/index.html";
             fi
+
+            echo "    index                                  index.html index.htm index.php;" >> $FILE_CONF;
+            echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
+
+            for SITE in ${SITES[@]};
+            do
+                readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
+                SITE_NAME="${SITE_PARTS[0]}";
+                SITE_LOCATION="$DIR_SITES/$SITE_NAME/$DIR_SITES_ROOT";
+                SITE_PHP_VERSION=$( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 );
+
+                echo "" >> $FILE_CONF;
+                echo "    location /$SITE_NAME {" >> $FILE_CONF;
+                echo "        alias                              $SITE_LOCATION;" >> $FILE_CONF;
+                echo "" >> $FILE_CONF;
+                echo "        location ~ \.php\$ {" >> $FILE_CONF;
+                echo "            fastcgi_pass                   $SITE_PHP_VERSION:9000;" >> $FILE_CONF;
+                echo "            fastcgi_index                  index.php;" >> $FILE_CONF;
+                echo "            include                        fastcgi.conf;" >> $FILE_CONF;
+                echo "        }" >> $FILE_CONF;
+                echo "    }" >> $FILE_CONF;
+
+                if [ ! -d "$SITE_LOCATION" ];
+                then
+                    mkdir -p $SITE_LOCATION;
+                    echo $SITE_NAME > "$SITE_LOCATION/index.html";
+                fi
+            done
         else
             echo "    location / {" >> $FILE_CONF;
             echo "        proxy_pass                         http://$SERVER_NAME:$SERVER_PORT;" >> $FILE_CONF;
