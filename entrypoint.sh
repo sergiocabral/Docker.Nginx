@@ -381,9 +381,6 @@ do
                 echo "" > "$DIR_DEFAULT_SERVER/index.html";
             fi
 
-            echo "    index                                  index.html index.htm index.php;" >> $FILE_CONF;
-            echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
-
             if [ "$AUTH_ENABLE" = true ];
             then
                 echo "    auth_basic                             \"Enter your access credentials to enter ${URLS[0]}\";" >> $FILE_CONF;
@@ -391,11 +388,46 @@ do
                 echo "" >> $FILE_CONF;
             fi
 
+            echo "    index                                  index.html index.htm index.php;" >> $FILE_CONF;
+
+            WRITE_ROOT=false;
             for SITE in ${SITES[@]};
             do
                 readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
                 SITE_NAME="${SITE_PARTS[0]}";
-                SITE_LOCATION="$DIR_SITES/$SITE_NAME/$DIR_SITES_ROOT";
+                if [ -z "$SITE_NAME" ];
+                then
+                    SITE_LOCATION="$DIR_SITES/${URLS[0]}/$DIR_SITES_ROOT";
+                    SITE_PHP_VERSION=$( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 );
+                    echo "    root                                   $SITE_LOCATION;" >> $FILE_CONF;
+
+                    echo "" >> $FILE_CONF;
+                    echo "    location ~ \.php\$ {" >> $FILE_CONF;
+                    echo "        fastcgi_pass                       $SITE_PHP_VERSION:9000;" >> $FILE_CONF;
+                    echo "        fastcgi_index                      index.php;" >> $FILE_CONF;
+                    echo "        include                            fastcgi.conf;" >> $FILE_CONF;
+                    echo "    }" >> $FILE_CONF;
+
+                    WRITE_ROOT=true;
+                fi
+            done
+
+            if [ "$WRITE_ROOT" = false ];
+            then
+                echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
+            fi
+
+            for SITE in ${SITES[@]};
+            do
+                readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
+                SITE_NAME="${SITE_PARTS[0]}";
+
+                if [ -z "$SITE_NAME" ];
+                then
+                    continue;
+                fi
+
+                SITE_LOCATION="$DIR_SITES/${URLS[0]}$( (test ! -z "$SITE_NAME" && echo "-$SITE_NAME") || echo "" )/$DIR_SITES_ROOT";
                 SITE_PHP_VERSION=$( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 );
 
                 echo "" >> $FILE_CONF;
@@ -412,7 +444,7 @@ do
                 if [ ! -d "$SITE_LOCATION" ];
                 then
                     mkdir -p $SITE_LOCATION;
-                    echo $SITE_NAME > "$SITE_LOCATION/index.html";
+                    echo "${URLS[0]}/$SITE_NAME" > "$SITE_LOCATION/index.html";
                 fi
             done
         else
