@@ -408,6 +408,12 @@ do
                     echo "        include                            fastcgi.conf;" >> $FILE_CONF;
                     echo "    }" >> $FILE_CONF;
 
+                    if [ ! -d "$SITE_LOCATION" ];
+                    then
+                        mkdir -p $SITE_LOCATION;
+                        echo "${URLS[0]}/$SITE_NAME" > "$SITE_LOCATION/index.html";
+                    fi
+
                     WRITE_ROOT=true;
                 fi
             done
