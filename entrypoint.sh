@@ -405,7 +405,8 @@ do
                     echo "    location ~ \.php\$ {" >> $FILE_CONF;
                     echo "        fastcgi_pass                       $SITE_PHP_VERSION:9000;" >> $FILE_CONF;
                     echo "        fastcgi_index                      index.php;" >> $FILE_CONF;
-                    echo "        include                            fastcgi.conf;" >> $FILE_CONF;
+                    echo "        include                            fastcgi_params;" >> $FILE_CONF;
+                    echo "        fastcgi_param                      SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
                     echo "    }" >> $FILE_CONF;
 
                     if [ ! -d "$SITE_LOCATION" ];
@@ -443,7 +444,8 @@ do
                 echo "        location ~ \.php\$ {" >> $FILE_CONF;
                 echo "            fastcgi_pass                   $SITE_PHP_VERSION:9000;" >> $FILE_CONF;
                 echo "            fastcgi_index                  index.php;" >> $FILE_CONF;
-                echo "            include                        fastcgi.conf;" >> $FILE_CONF;
+                echo "            include                        fastcgi_params;" >> $FILE_CONF;
+                echo "            fastcgi_param                  SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
                 echo "        }" >> $FILE_CONF;
                 echo "    }" >> $FILE_CONF;
 
