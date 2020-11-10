@@ -21,14 +21,16 @@ If you want, configure a website or reverse proxy of your services using only en
 - You can enter one or more separated by space.
 - Each url entered here is linked to the SSL certificate, if it is generated.
 
-`HOST1_LOCATION` = `10.0.0.10:5555` or `website-directory-name`
+`HOST1_LOCATION` = `10.0.0.10:5555` or `website-directory/php7`
 
 - Mandatory value.
 - For reverse proxy use:
   - Service access name, either hostname or IP.
   - It is mandatory to inform the port (after the colon) of the service, which in turn will be exposed as an HTTP or HTTPS port.
 - For website use:
-  - Directory name with characters set `a-z`, `0-9`, `-`, `.`.
+  - Use empty directory name with PHP version as `/php5` or `/php7`.
+  - Use directory name with characters set `a-z`, `0-9`, `-`, `.` to set sub-sites.
+  - Example to value of `HOST1_LOCATION` with main website with PHP5 and subsite1 with default PHP version and subsite2 with PHP7: `/php5,subsite1,subsite2/php7`.
 
 `HOST1_AUTH` = `username1=password1,username2=password2,username3=password3`
 
@@ -58,7 +60,7 @@ If the first on the list is `HOST2`, nothing else will be considered.
 
 `/etc/nginx.templates`
 
-- Use files `/etc/squid.templates/*.template` to make the files in the `/etc/nginx/conf.d` directory with replacement of environment variables with their values.
+- Use files `*.template` in this directory to make the files in the `/etc/nginx/conf.d` directory with replacement of environment variables with their values.
 
 `/etc/nginx.conf`
 
@@ -76,7 +78,11 @@ If the first on the list is `HOST2`, nothing else will be considered.
 
 `/var/log/nginx`
 
-- Log files.
+- Log files for nginx.
+
+`/var/log/letsencrypt`
+
+- Log files for Let's Encrypt Certbot.
 
 `/var/lib/nginx/tmp`
 
@@ -84,7 +90,7 @@ If the first on the list is `HOST2`, nothing else will be considered.
 
 ## Exposed Port
 
-Automatic reverse proxy settings using environment variables register as HTTP and HTTPS ports 80 and 443 respectively.
+Automatic reverse proxy or website settings using environment variables register as HTTP and HTTPS ports 80 and 443 respectively.
 
 ## Example for *docker-compose.yml*
 
