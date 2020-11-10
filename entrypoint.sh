@@ -162,7 +162,7 @@ fi
 $LS -d $DIR_CERTIFICATES_HOST/*;
 
 printf "Removing previous site configurations.\n";
-rm $DIR_CONF_D/$PREFIX_SITE*;
+rm -f $DIR_CONF_D/$PREFIX_SITE*;
 
 INDEX_HOST=1;
 while [ -n "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
