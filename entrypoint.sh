@@ -153,6 +153,8 @@ then
         -out "$DIR_CERTIFICATES_HOST_FULLCHAIN" \
         -subj "/C=/ST=/L=/O=/CN=";
 
+    date -u >> $DIR_CERTIFICATES_HOST/DATETIME;
+
     printf "Auto-signed certificate files created:\n";
 else
     printf "Auto-signed certificate files already exist:\n";
@@ -329,6 +331,8 @@ do
 
                 rm -R $DIR_CERTBOT_WEBROOT;
                 rm -f $FILE_CONF;
+
+                date -u >> $DIR_CERTIFICATES_HOST/DATETIME;
 
                 printf "Certificates files created:\n";
             else
