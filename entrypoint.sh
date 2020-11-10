@@ -96,12 +96,16 @@ then
 
         FILE_CONF="$DIR_CONF_D_TEMPLATES/default.conf$SUFFIX_TEMPLATE";
         printf "Adjusting default configuration file template: $(basename $FILE_CONF)\n";
+
+        SITE_DIR_NAME=$DEFAULT_SERVER_NAME;
         echo "" >> $FILE_CONF;
         echo "server {" >> $FILE_CONF;
         echo "    listen              443 ssl;" >> $FILE_CONF;
         echo "    listen              [::]:443 ssl;" >> $FILE_CONF;
         echo "    ssl_certificate     $FILE_CERTIFICATE_DEFAULT.crt;" >> $FILE_CONF;
         echo "    ssl_certificate_key $FILE_CERTIFICATE_DEFAULT.key;" >> $FILE_CONF;
+        echo "    access_log          /var/log/nginx/${SITE_DIR_NAME}-443-access.log;" >> $FILE_CONF;
+        echo "    error_log           /var/log/nginx/${SITE_DIR_NAME}-443-error.log;" >> $FILE_CONF;
         echo "    return              301 http://\$host\$request_uri;" >> $FILE_CONF;
         echo "}" >> $FILE_CONF;
 
@@ -154,6 +158,9 @@ else
     printf "Auto-signed certificate files already exist:\n";
 fi
 $LS -d $DIR_CERTIFICATES_HOST/*;
+
+printf "Removing previous site configurations.\n";
+rm $DIR_CONF_D/$PREFIX_SITE*;
 
 INDEX_HOST=1;
 while [ -n "$(VAR_NAME="HOST${INDEX_HOST}_URL"; echo "${!VAR_NAME}")" ];
@@ -294,10 +301,13 @@ do
                 mkdir -p $DIR_CERTBOT_WEBROOT;
                 chmod -R 777 $DIR_CERTBOT_WEBROOT;
                 
+                SITE_DIR_NAME="${URLS[0]}-letsencrypt";
                 echo "server {" >> $FILE_CONF;
                 echo "    listen                       80;" >> $FILE_CONF;
                 echo "    listen                       [::]:80;" >> $FILE_CONF;
-                echo "    server_name                  $URLS_ALL;" >> $FILE_CONF;        
+                echo "    server_name                  $URLS_ALL;" >> $FILE_CONF;
+                echo "    access_log                   /var/log/nginx/${SITE_DIR_NAME}-80-access.log;" >> $FILE_CONF;
+                echo "    error_log                    /var/log/nginx/${SITE_DIR_NAME}-80-error.log;" >> $FILE_CONF;
                 echo "    location / {" >> $FILE_CONF;
                 echo "        root                     $DIR_CERTBOT_WEBROOT;" >> $FILE_CONF;
                 echo "    }" >> $FILE_CONF;
@@ -350,10 +360,13 @@ do
         
         if [ "$SSL_ENABLE" = true ];
         then
+            SITE_DIR_NAME="${URLS[0]}-$DEFAULT_SERVER_NAME";
             echo "server {" >> $FILE_CONF;
             echo "    listen                                 80;" >> $FILE_CONF;
             echo "    listen                                 [::]:80;" >> $FILE_CONF;
             echo "    server_name                            $URLS_ALL;" >> $FILE_CONF;
+            echo "    access_log                             /var/log/nginx/${SITE_DIR_NAME}-80-access.log;" >> $FILE_CONF;
+            echo "    error_log                              /var/log/nginx/${SITE_DIR_NAME}-80-error.log;" >> $FILE_CONF;
             echo "    return                                 301 https://\$host\$request_uri;" >> $FILE_CONF;
             echo "}" >> $FILE_CONF;
             echo "" >> $FILE_CONF;
@@ -365,12 +378,21 @@ do
         then
             echo "    listen                                 443 ssl;" >> $FILE_CONF;
             echo "    listen                                 [::]:443 ssl;" >> $FILE_CONF;
+            echo "" >> $FILE_CONF;
+            SITE_PORT="443";
         else
             echo "    listen                                 80;" >> $FILE_CONF;
             echo "    listen                                 [::]:80;" >> $FILE_CONF;
+            echo "" >> $FILE_CONF;
+            SITE_PORT="80";
         fi
 
         echo "    server_name                            $URLS_ALL;" >> $FILE_CONF;
+        echo "" >> $FILE_CONF;
+
+        SITE_DIR_NAME="${URLS[0]}-$DEFAULT_SERVER_NAME";
+        echo "    access_log                             /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-access.log;" >> $FILE_CONF;
+        echo "    error_log                              /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-error.log;" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
 
         if [ -n "${SITES[0]}" ];
@@ -388,7 +410,7 @@ do
                 echo "" >> $FILE_CONF;
             fi
 
-            echo "    index                                  index.html index.htm index.php;" >> $FILE_CONF;
+            echo "    index                                  index.php index.html index.htm;" >> $FILE_CONF;
 
             WRITE_ROOT=false;
             for SITE in ${SITES[@]};
@@ -434,12 +456,16 @@ do
                     continue;
                 fi
 
-                SITE_LOCATION="$DIR_SITES/${URLS[0]}$( (test ! -z "$SITE_NAME" && echo "-$SITE_NAME") || echo "" )/$DIR_SITES_ROOT";
+                SITE_DIR_NAME=${URLS[0]}$( (test ! -z "$SITE_NAME" && echo "-$SITE_NAME") || echo "" );
+                SITE_LOCATION="$DIR_SITES/$SITE_DIR_NAME/$DIR_SITES_ROOT";
                 SITE_PHP_VERSION=$( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 );
 
                 echo "" >> $FILE_CONF;
                 echo "    location /$SITE_NAME {" >> $FILE_CONF;
                 echo "        alias                              $SITE_LOCATION;" >> $FILE_CONF;
+                echo "" >> $FILE_CONF;
+                echo "        access_log                         /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-access.log;" >> $FILE_CONF;
+                echo "        error_log                          /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-error.log;" >> $FILE_CONF;
                 echo "" >> $FILE_CONF;
                 echo "        location ~ \.php\$ {" >> $FILE_CONF;
                 echo "            fastcgi_pass                   $SITE_PHP_VERSION:9000;" >> $FILE_CONF;
