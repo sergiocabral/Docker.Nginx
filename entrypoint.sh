@@ -182,6 +182,9 @@ do
     VAR_NAME="HOST${INDEX_HOST}_AUTH";
     AUTH_INFO=${!VAR_NAME};
 
+    VAR_NAME="HOST${INDEX_HOST}_NGINX_CONFIG";
+    NGINX_CONFIG=${!VAR_NAME};
+
     SSL_ENABLE=$( (test -n "$SSL_EMAIL" && echo true) || echo false )
     AUTH_ENABLE=$( (test -n "$AUTH_INFO" && echo true) || echo false );
 
@@ -516,6 +519,13 @@ do
             echo "    ssl_certificate                        $DIR_CERTIFICATES_HOST_FULLCHAIN;" >> $FILE_CONF;
             echo "    ssl_certificate_key                    $DIR_CERTIFICATES_HOST_PRIVKEY;" >> $FILE_CONF;
         fi
+
+	if [ ! -z "$NGINX_CONFIG" ];
+	then
+            echo "" >> $FILE_CONF;
+            echo "    $NGINX_CONFIG" >> $FILE_CONF;
+	fi
+
         echo "}" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
 

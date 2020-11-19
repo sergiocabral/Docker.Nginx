@@ -44,6 +44,11 @@ If you want, configure a website or reverse proxy of your services using only en
 - If this field is not informed, a Let's Encrypt SSL certificate will not be registered for the domains informed in the first field above.
 - If an e-mail is informed, Let's Encrypt will be asked for a certificate for the informed domains that will in turn be associated with this e-mail.
 
+`HOST1_NGINX_CONFIG` = `try_files $uri $uri/ /index.php?$args;`
+
+- Optional value.
+- Use to pass additional configurations do Nginx section. The example above configure Wordpress rewrite.
+
 **Configuring more than one:**
 
 As you should see the names of the environment variables above are prefixed with `HOST1`. To register other services sequentially use `HOST2`, `HOST3` and so on.
