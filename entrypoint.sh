@@ -319,7 +319,7 @@ do
                 sleep 1;
 
                 CERTBOT_ARG_DOMAINS=$(IFS="§"; echo "${URLS[*]}");
-                CERTBOT_ARG_DOMAINS="-d ${CERTBOT_ARG_DOMAINS/§/" -d "}";
+                CERTBOT_ARG_DOMAINS="-d ${CERTBOT_ARG_DOMAINS//§/" -d "}";
                 CERTBOT_ARG="certonly -n --agree-tos --webroot -w $DIR_CERTBOT_WEBROOT -m $SSL_EMAIL --cert-name ${URLS[0]} $CERTBOT_ARG_DOMAINS";
                 CERTBOT_COMMAND="$CERTBOT_EXECUTABLE $CERTBOT_ARG";
                 printf "$CERTBOT_COMMAND\n";
