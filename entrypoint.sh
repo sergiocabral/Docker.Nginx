@@ -202,7 +202,7 @@ do
     then
         readarray -t SITES < <($DIR_SCRIPTS/split-to-lines.sh "," "$SERVER,");
 
-        SITE_REGEX="^[a-zA-Z0-9\.-_]+(|/php[57])$";
+        SITE_REGEX="^[a-zA-Z0-9\.-_]+(|/php[57]|/wordpress)$";
         for SITE in ${SITES[@]};
         do
             if [ ! -z "$SITE" ] && [[ ! "${SITE}" =~ ${SITE_REGEX} ]];
@@ -240,14 +240,37 @@ do
 
         if [ ! -z "${SITES[0]}" ];
         then
+            SITES_DIRECTORY=();
+            SITES_FEATURE_PHP=();
+            SITES_FEATURE_WORDPRESS=();
+
             INDEX_SITE=0;
             for SITE in ${SITES[@]};
             do
-                INDEX_SITE=$((INDEX_SITE + 1));
                 readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
-                printf "    Site $INDEX_SITE\n";
-                printf "    - Directory:    ${SITE_PARTS[0]}\n";
-                printf "    - PHP version:  $( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 )\n";
+
+                SITES_DIRECTORY[$INDEX_SITE]=${SITE_PARTS[0]};
+
+                if [[ "$SITE" =~ "/php5" ]];
+                then
+                    SITES_FEATURE_PHP[$INDEX_SITE]="php5";
+                else
+                    SITES_FEATURE_PHP[$INDEX_SITE]="php7";
+                fi
+
+                if [[ "$SITE" =~ "/wordpress" ]];
+                then
+                    SITES_FEATURE_WORDPRESS[$INDEX_SITE]="wordpress";
+                else
+                    SITES_FEATURE_WORDPRESS[$INDEX_SITE]="";
+                fi
+
+                printf "    Site $((INDEX_SITE + 1))\n";
+                printf "    - Directory:    ${SITES_DIRECTORY[$INDEX_SITE]}\n";
+                printf "    - PHP Version:  ${SITES_FEATURE_PHP[$INDEX_SITE]}\n";
+                printf "    - Wordpress:    $( (test ! -z "${SITES_FEATURE_WORDPRESS[$INDEX_SITE]}" && echo "yes" ) || echo "no" )\n";
+
+                INDEX_SITE=$((INDEX_SITE + 1));
             done
         else
             printf "    Reverse proxy\n";
@@ -420,19 +443,17 @@ do
             echo "    index                                  index.php index.html index.htm;" >> $FILE_CONF;
 
             WRITE_ROOT=false;
+            INDEX_SITE=0;
             for SITE in ${SITES[@]};
             do
-                readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
-                SITE_NAME="${SITE_PARTS[0]}";
-                if [ -z "$SITE_NAME" ];
+                if [ -z "${SITES_DIRECTORY[$INDEX_SITE]}" ];
                 then
                     SITE_LOCATION="$DIR_SITES/${URLS[0]}/$DIR_SITES_ROOT";
-                    SITE_PHP_VERSION=$( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 );
                     echo "    root                                   $SITE_LOCATION;" >> $FILE_CONF;
 
                     echo "" >> $FILE_CONF;
                     echo "    location ~ \.php\$ {" >> $FILE_CONF;
-                    echo "        fastcgi_pass                       $SITE_PHP_VERSION:9000;" >> $FILE_CONF;
+                    echo "        fastcgi_pass                       ${SITES_FEATURE_PHP[$INDEX_SITE]}:9000;" >> $FILE_CONF;
                     echo "        fastcgi_index                      index.php;" >> $FILE_CONF;
                     echo "        include                            fastcgi_params;" >> $FILE_CONF;
                     echo "        fastcgi_param                      SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
@@ -446,6 +467,7 @@ do
 
                     WRITE_ROOT=true;
                 fi
+                INDEX_SITE=$((INDEX_SITE + 1));
             done
 
             if [ "$WRITE_ROOT" = false ];
@@ -453,19 +475,16 @@ do
                 echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
             fi
 
+            INDEX_SITE=0;
             for SITE in ${SITES[@]};
             do
-                readarray -t SITE_PARTS < <($DIR_SCRIPTS/split-to-lines.sh "/" "$SITE/");
-                SITE_NAME="${SITE_PARTS[0]}";
-
-                if [ -z "$SITE_NAME" ];
+                if [ -z "${SITES_DIRECTORY[$INDEX_SITE]}" ];
                 then
                     continue;
                 fi
 
-                SITE_DIR_NAME=${URLS[0]}$( (test ! -z "$SITE_NAME" && echo "-$SITE_NAME") || echo "" );
+                SITE_DIR_NAME=${URLS[0]}$( (test ! -z "${SITES_DIRECTORY[$INDEX_SITE]}" && echo "-${SITES_DIRECTORY[$INDEX_SITE]}") || echo "" );
                 SITE_LOCATION="$DIR_SITES/$SITE_DIR_NAME/$DIR_SITES_ROOT";
-                SITE_PHP_VERSION=$( (test ! -z "${SITE_PARTS[1]}" && echo ${SITE_PARTS[1]}) || echo php7 );
 
                 echo "" >> $FILE_CONF;
                 echo "    location /$SITE_NAME {" >> $FILE_CONF;
@@ -475,7 +494,7 @@ do
                 echo "        error_log                          /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-error.log;" >> $FILE_CONF;
                 echo "" >> $FILE_CONF;
                 echo "        location ~ \.php\$ {" >> $FILE_CONF;
-                echo "            fastcgi_pass                   $SITE_PHP_VERSION:9000;" >> $FILE_CONF;
+                echo "            fastcgi_pass                   ${SITES_FEATURE_PHP[$INDEX_SITE]}:9000;" >> $FILE_CONF;
                 echo "            fastcgi_index                  index.php;" >> $FILE_CONF;
                 echo "            include                        fastcgi_params;" >> $FILE_CONF;
                 echo "            fastcgi_param                  SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
@@ -487,6 +506,8 @@ do
                     mkdir -p $SITE_LOCATION;
                     echo "${URLS[0]}/$SITE_NAME" > "$SITE_LOCATION/index.html";
                 fi
+
+                INDEX_SITE=$((INDEX_SITE + 1));
             done
         else
             echo "    location / {" >> $FILE_CONF;
