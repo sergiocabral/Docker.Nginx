@@ -333,7 +333,7 @@ do
                 echo "    access_log                   /var/log/nginx/${SITE_DIR_NAME}-80-access.log;" >> $FILE_CONF;
                 echo "    error_log                    /var/log/nginx/${SITE_DIR_NAME}-80-error.log;" >> $FILE_CONF;
                 echo "    location / {" >> $FILE_CONF;
-                echo "        root                     $DIR_CERTBOT_WEBROOT;" >> $FILE_CONF;
+                echo "        root                     $DIR_CERTBOT_WEBROOT/;" >> $FILE_CONF;
                 echo "    }" >> $FILE_CONF;
                 echo "}" >> $FILE_CONF;
 
@@ -439,7 +439,7 @@ do
                 echo "" > $DIR_DEFAULT_SERVER/index.html;
                 $LS $DIR_DEFAULT_SERVER/index.html;
             fi
-            echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
+            echo "    root                                   $DIR_DEFAULT_SERVER/;" >> $FILE_CONF;
 
             if [ "$AUTH_ENABLE" = true ];
             then
