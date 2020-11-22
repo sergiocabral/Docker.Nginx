@@ -11,6 +11,8 @@ RUN apk add --no-cache \
 COPY ./scripts/bash/split-to-lines.sh /root/
 COPY ./scripts/bash/envsubst-files.sh /root/
 
+COPY ./nginx-*.template /root/
+
 COPY ./entrypoint.sh /root/
 
 RUN chmod 755 /root/*.sh

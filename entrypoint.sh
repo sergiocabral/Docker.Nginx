@@ -126,6 +126,10 @@ else
     sleep 1;
 fi
 
+printf "Creating (if not exist) template part configuration file.\n";
+cp -u $DIR_SCRIPTS/nginx-*.part$SUFFIX_TEMPLATE $DIR_CONF_D_TEMPLATES/;
+$LS $DIR_CONF_D_TEMPLATES/nginx-*.part$SUFFIX_TEMPLATE;
+
 printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF_D directory with replacement of environment variables with their values.\n";
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
@@ -429,9 +433,12 @@ do
         then
             if [ ! -d "$DIR_DEFAULT_SERVER" ];
             then
+                printf "Creating empty index.html file to be used as default_server.\n";
                 mkdir -p $DIR_DEFAULT_SERVER;
-                echo "" > "$DIR_DEFAULT_SERVER/index.html";
+                echo "" > $DIR_DEFAULT_SERVER/index.html;
+                $LS $DIR_DEFAULT_SERVER/index.html;
             fi
+            echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
 
             if [ "$AUTH_ENABLE" = true ];
             then
@@ -442,69 +449,46 @@ do
 
             echo "    index                                  index.php index.html index.htm;" >> $FILE_CONF;
 
-            WRITE_ROOT=false;
-            INDEX_SITE=0;
-            for SITE in ${SITES[@]};
-            do
-                if [ -z "${SITES_DIRECTORY[$INDEX_SITE]}" ];
-                then
-                    SITE_LOCATION="$DIR_SITES/${URLS[0]}/$DIR_SITES_ROOT";
-                    echo "    root                                   $SITE_LOCATION;" >> $FILE_CONF;
-
-                    echo "" >> $FILE_CONF;
-                    echo "    location ~ \.php\$ {" >> $FILE_CONF;
-                    echo "        fastcgi_pass                       ${SITES_FEATURE_PHP[$INDEX_SITE]}:9000;" >> $FILE_CONF;
-                    echo "        fastcgi_index                      index.php;" >> $FILE_CONF;
-                    echo "        include                            fastcgi_params;" >> $FILE_CONF;
-                    echo "        fastcgi_param                      SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
-                    echo "    }" >> $FILE_CONF;
-
-                    if [ ! -d "$SITE_LOCATION" ];
-                    then
-                        mkdir -p $SITE_LOCATION;
-                        echo "${URLS[0]}/$SITE_NAME" > "$SITE_LOCATION/index.html";
-                    fi
-
-                    WRITE_ROOT=true;
-                fi
-                INDEX_SITE=$((INDEX_SITE + 1));
-            done
-
-            if [ "$WRITE_ROOT" = false ];
-            then
-                echo "    root                                   $DIR_DEFAULT_SERVER;" >> $FILE_CONF;
-            fi
+            echo "    include                                $DIR_CONF_D/nginx-server-common.conf.part;" >> $FILE_CONF;
 
             INDEX_SITE=0;
             for SITE in ${SITES[@]};
             do
-                if [ -z "${SITES_DIRECTORY[$INDEX_SITE]}" ];
-                then
-                    continue;
-                fi
-
-                SITE_DIR_NAME=${URLS[0]}$( (test ! -z "${SITES_DIRECTORY[$INDEX_SITE]}" && echo "-${SITES_DIRECTORY[$INDEX_SITE]}") || echo "" );
-                SITE_LOCATION="$DIR_SITES/$SITE_DIR_NAME/$DIR_SITES_ROOT";
+                SITE_LOCATION=${SITES_DIRECTORY[$INDEX_SITE]};
+                SITE_DIR_NAME=${URLS[0]}$( (test ! -z "$SITE_LOCATION" && echo "-$SITE_LOCATION") || echo "" );
+                SITE_LOCATION_PATH="$DIR_SITES/$SITE_DIR_NAME/$DIR_SITES_ROOT";
 
                 echo "" >> $FILE_CONF;
-                echo "    location /$SITE_NAME {" >> $FILE_CONF;
-                echo "        alias                              $SITE_LOCATION;" >> $FILE_CONF;
+                echo "    location /$SITE_LOCATION {" >> $FILE_CONF;
+                echo "        alias                              $SITE_LOCATION_PATH/;" >> $FILE_CONF;
                 echo "" >> $FILE_CONF;
                 echo "        access_log                         /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-access.log;" >> $FILE_CONF;
                 echo "        error_log                          /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-error.log;" >> $FILE_CONF;
                 echo "" >> $FILE_CONF;
-                echo "        location ~ \.php\$ {" >> $FILE_CONF;
+
+                if [ ! -z "${SITES_FEATURE_WORDPRESS[$INDEX_SITE]}" ];
+                then
+                    echo "        try_files                          \$uri \$uri/ $( (test ! -z "$SITE_LOCATION" && echo "/$SITE_LOCATION") || echo "" )/index.php?\$args;" >> $FILE_CONF;
+                    echo "" >> $FILE_CONF;
+                fi
+
+                echo "        location ~ [^/]\.php(/|\$) {" >> $FILE_CONF;
+                echo "            fastcgi_split_path_info        ^(.+?\.php)(/.*)\$;" >> $FILE_CONF;
                 echo "            fastcgi_pass                   ${SITES_FEATURE_PHP[$INDEX_SITE]}:9000;" >> $FILE_CONF;
                 echo "            fastcgi_index                  index.php;" >> $FILE_CONF;
                 echo "            include                        fastcgi_params;" >> $FILE_CONF;
                 echo "            fastcgi_param                  SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
+                echo "            fastcgi_intercept_errors       on;" >> $FILE_CONF;
                 echo "        }" >> $FILE_CONF;
+
                 echo "    }" >> $FILE_CONF;
 
-                if [ ! -d "$SITE_LOCATION" ];
+                if [ ! -d "$SITE_LOCATION_PATH" ];
                 then
-                    mkdir -p $SITE_LOCATION;
-                    echo "${URLS[0]}/$SITE_NAME" > "$SITE_LOCATION/index.html";
+                    printf "Creating sample index.html file for /$SITE_LOCATION location.\n";
+                    mkdir -p $SITE_LOCATION_PATH;
+                    echo "${URLS[0]}/$SITE_NAME" > $SITE_LOCATION_PATH/index.html;
+                    $LS $SITE_LOCATION_PATH/index.html;
                 fi
 
                 INDEX_SITE=$((INDEX_SITE + 1));
@@ -541,11 +525,11 @@ do
             echo "    ssl_certificate_key                    $DIR_CERTIFICATES_HOST_PRIVKEY;" >> $FILE_CONF;
         fi
 
-	if [ ! -z "$NGINX_CONFIG" ];
-	then
+        if [ ! -z "$NGINX_CONFIG" ];
+        then
             echo "" >> $FILE_CONF;
             echo "    $NGINX_CONFIG" >> $FILE_CONF;
-	fi
+        fi
 
         echo "}" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
