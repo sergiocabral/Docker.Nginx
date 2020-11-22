@@ -476,7 +476,9 @@ do
 
                 if [ ! -z "${SITES_FEATURE_WORDPRESS[$INDEX_SITE]}" ];
                 then
-                    echo "        try_files                          \$uri \$uri/ $( (test ! -z "$SITE_LOCATION" && echo "/$SITE_LOCATION") || echo "" )/index.php?\$args;" >> $FILE_CONF;
+                    echo "        if (!-e \$request_filename) {" >> $FILE_CONF;
+                    echo "            rewrite ^/(.*)$ /index.php?\$1;" >> $FILE_CONF;
+                    echo "        }" >> $FILE_CONF;
                     echo "" >> $FILE_CONF;
                 fi
 
