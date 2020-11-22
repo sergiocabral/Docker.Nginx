@@ -126,14 +126,6 @@ else
     sleep 1;
 fi
 
-printf "Creating (if not exist) template part configuration file.\n";
-cp -u $DIR_SCRIPTS/nginx-*.part$SUFFIX_TEMPLATE $DIR_CONF_D_TEMPLATES/;
-$LS $DIR_CONF_D_TEMPLATES/nginx-*.part$SUFFIX_TEMPLATE;
-
-printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF_D directory with replacement of environment variables with their values.\n";
-
-$DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
-
 DIR_CERTIFICATES_HOST="$DIR_CERTIFICATES_DEFAULT";
 DIR_CERTIFICATES_HOST_FULLCHAIN="$FILE_CERTIFICATE_DEFAULT.crt";
 DIR_CERTIFICATES_HOST_PRIVKEY="$FILE_CERTIFICATE_DEFAULT.key";
@@ -429,6 +421,15 @@ do
         echo "    error_log                              /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-error.log;" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
 
+        TEMPLATE_CONF_FILE="server-${URLS[0]}.conf.part";
+        if [ ! -f "$DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE" ];
+        then
+            echo "# This file will be inserted into section: server { <inserted here> }" > $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
+        fi
+        echo "    include                                $DIR_CONF_D/server-common.conf.part;" >> $FILE_CONF;
+        echo "    include                                $DIR_CONF_D/$TEMPLATE_CONF_FILE;" >> $FILE_CONF;
+        echo "" >> $FILE_CONF;
+
         if [ -n "${SITES[0]}" ];
         then
             if [ ! -d "$DIR_DEFAULT_SERVER" ];
@@ -449,8 +450,6 @@ do
 
             echo "    index                                  index.php index.html index.htm;" >> $FILE_CONF;
 
-            echo "    include                                $DIR_CONF_D/nginx-server-common.conf.part;" >> $FILE_CONF;
-
             INDEX_SITE=0;
             for SITE in ${SITES[@]};
             do
@@ -464,6 +463,15 @@ do
                 echo "" >> $FILE_CONF;
                 echo "        access_log                         /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-access.log;" >> $FILE_CONF;
                 echo "        error_log                          /var/log/nginx/${SITE_DIR_NAME}-$SITE_PORT-error.log;" >> $FILE_CONF;
+                echo "" >> $FILE_CONF;
+
+                TEMPLATE_CONF_FILE="location-$SITE_DIR_NAME.conf.part";
+                if [ ! -f "$DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE" ];
+                then
+                    echo "# This file will be inserted into section: server { location /directory { <inserted here> } }" > $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
+                fi
+                echo "        include                            $DIR_CONF_D/location-common.conf.part;" >> $FILE_CONF;
+                echo "        include                            $DIR_CONF_D/$TEMPLATE_CONF_FILE;" >> $FILE_CONF;
                 echo "" >> $FILE_CONF;
 
                 if [ ! -z "${SITES_FEATURE_WORDPRESS[$INDEX_SITE]}" ];
@@ -505,6 +513,16 @@ do
                 echo "" >> $FILE_CONF;
             fi
 
+            TEMPLATE_CONF_FILE="location-${URLS[0]}.conf.part";
+            if [ ! -f "$DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE" ];
+            then
+                echo "# This file will be inserted into section: server { location / { <inserted here> } }" > $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
+            fi
+            echo "" >> $FILE_CONF;
+            echo "        include                            $DIR_CONF_D/location-common.conf.part;" >> $FILE_CONF;
+            echo "        include                            $DIR_CONF_D/$TEMPLATE_CONF_FILE;" >> $FILE_CONF;
+            echo "" >> $FILE_CONF;
+
             echo "        proxy_http_version                 1.1;" >> $FILE_CONF;
             echo "        proxy_cache_bypass                 \$http_upgrade;" >> $FILE_CONF;
             echo "        proxy_set_header Upgrade           \$http_upgrade;" >> $FILE_CONF;
@@ -545,8 +563,21 @@ done
 
 if [ "$INDEX_HOST" = 1 ];
 then
-    printf "No reverse proxy settings were found on the environment variables.\n";
+    printf "No reverse proxy or website settings were found on the environment variables.\n";
 fi
+
+ls -d1 $DIR_SCRIPTS/nginx-*.part$SUFFIX_TEMPLATE | \
+    sed 's/\/.*\///' | \
+    xargs -I {} cp -u $DIR_SCRIPTS/{} $DIR_CONF_D_TEMPLATES/{};
+ls -d1 $DIR_SCRIPTS/nginx-*.part$SUFFIX_TEMPLATE | \
+    sed 's/\/.*\/nginx-//' | \
+    xargs -I {} mv $DIR_CONF_D_TEMPLATES/nginx-{} $DIR_CONF_D_TEMPLATES/{};
+printf "Template part configuration files was created (if not exist).\n";
+$LS $DIR_CONF_D_TEMPLATES/*.part$SUFFIX_TEMPLATE;
+
+printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF_D directory with replacement of environment variables with their values.\n";
+
+$DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
 
 printf "Starting nginx.\n";
 
