@@ -554,8 +554,18 @@ do
         echo "}" >> $FILE_CONF;
         echo "" >> $FILE_CONF;
 
-        printf "Configuration file created: $FILE_CONF\n";
+        FILE_CONF_TEMPLATE="$DIR_CONF_D_TEMPLATES/$( basename $FILE_CONF)$SUFFIX_TEMPLATE";
+        if [ ! -f $FILE_CONF_TEMPLATE ] || [ "" = "$(cat $FILE_CONF_TEMPLATE | grep -v -s '^#' | grep -v -s '^\s*$')" ];
+        then
+            echo "#Uncomment to use this configuration file" > $FILE_CONF_TEMPLATE;
+            echo "" >> $FILE_CONF_TEMPLATE;
+            cat $FILE_CONF >> $FILE_CONF_TEMPLATE
+            sed -i 's/^/#/g' $FILE_CONF_TEMPLATE;
 
+            printf "Configuration file created: $FILE_CONF\n";
+        else
+            printf "Using template configuration file created: $FILE_CONF_TEMPLATE\n";
+        fi
     else
         printf "Configuration aborted.\n";
     fi
@@ -579,7 +589,20 @@ $LS $DIR_CONF_D_TEMPLATES/*.part$SUFFIX_TEMPLATE;
 
 printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF_D directory with replacement of environment variables with their values.\n";
 
+ls -1 ${DIR_CONF_D_TEMPLATES}/ | \
+    grep ${SUFFIX_TEMPLATE}$ | \
+    xargs -I {} echo ${DIR_CONF_D_TEMPLATES}/{} | \
+    xargs -I {} sh -c '( test "" = "$(cat {} | grep -v ^# | grep -v ^\s*$)" && echo echo Ignoring empty template: {} && mv {} {}-isEmpty ) || echo ' | \
+    sh;
+
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_D_TEMPLATES" "$DIR_CONF_D";
+
+ls -1 ${DIR_CONF_D_TEMPLATES}/ | \
+    grep ${SUFFIX_TEMPLATE}-isEmpty$ | \
+    xargs -I {} echo ${DIR_CONF_D_TEMPLATES}/{} | \
+    xargs -I {} echo mv {} {} | \
+    sed 's/-isEmpty$//' | \
+    sh;
 
 printf "Starting nginx.\n";
 

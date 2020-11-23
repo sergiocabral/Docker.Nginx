@@ -66,6 +66,12 @@ If the first on the list is `HOST2`, nothing else will be considered.
 `/etc/nginx.templates`
 
 - Use files `*.template` in this directory to make the files in the `/etc/nginx/conf.d` directory with replacement of environment variables with their values.
+- If a `.template` file is empty or all commented it will be ignored.
+- The file `server-common.conf.part.template` will be inserted into each Nginx `server` section of any website.
+- Files as `server-*.conf.part.template` will be inserted into each Nginx `server` section.
+- The file `location-common.conf.part.template` will be inserted into each Nginx `location` section of any website.
+- Files as `location-*.conf.part.template` will be inserted into each Nginx `location` section.
+- Files as `site-*.conf.template` will be used instead on the fly generated configuration file.
 
 `/etc/nginx.conf`
 
