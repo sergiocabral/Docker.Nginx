@@ -119,6 +119,12 @@ then
     chown -R $USER:$USER $DIR_CONF_D_TEMPLATES;
     
     $LS -d $DIR_CONF $DIR_CONF_BACKUP $DIR_CONF_DOCKER $DIR_CONF_D_TEMPLATES;
+
+    printf "Created common template files.\n";
+    echo "# This file will be inserted for any site into section: server { <inserted here> }" > $DIR_CONF_D/server-common.conf.part;
+    cp -f $DIR_CONF_D/server-common.conf.part $DIR_CONF_D_TEMPLATES/server-common.conf.part$SUFFIX_TEMPLATE;
+    echo "# This file will be inserted for any site into section: server { location /directory { <inserted here> } }" > $DIR_CONF_D/location-common.conf.part;
+    cp -f $DIR_CONF_D/location-common.conf.part $DIR_CONF_D_TEMPLATES/location-common.conf.part$SUFFIX_TEMPLATE;
 else
     printf "This is NOT the first run.\n";
 
@@ -424,7 +430,8 @@ do
         TEMPLATE_CONF_FILE="server-${URLS[0]}.conf.part";
         if [ ! -f "$DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE" ];
         then
-            echo "# This file will be inserted into section: server { <inserted here> }" > $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
+            echo "# This file will be inserted into section: server { <inserted here> }" > $DIR_CONF_D/$TEMPLATE_CONF_FILE;
+            cp -f $DIR_CONF_D/$TEMPLATE_CONF_FILE $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
         fi
         echo "    include                                $DIR_CONF_D/server-common.conf.part;" >> $FILE_CONF;
         echo "    include                                $DIR_CONF_D/$TEMPLATE_CONF_FILE;" >> $FILE_CONF;
@@ -468,7 +475,8 @@ do
                 TEMPLATE_CONF_FILE="location-$SITE_DIR_NAME.conf.part";
                 if [ ! -f "$DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE" ];
                 then
-                    echo "# This file will be inserted into section: server { location /directory { <inserted here> } }" > $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
+                    echo "# This file will be inserted into section: server { location /directory { <inserted here> } }" > $DIR_CONF_D/$TEMPLATE_CONF_FILE;
+                    cp -f $DIR_CONF_D/$TEMPLATE_CONF_FILE $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
                 fi
                 echo "        include                            $DIR_CONF_D/location-common.conf.part;" >> $FILE_CONF;
                 echo "        include                            $DIR_CONF_D/$TEMPLATE_CONF_FILE;" >> $FILE_CONF;
@@ -518,7 +526,8 @@ do
             TEMPLATE_CONF_FILE="location-${URLS[0]}.conf.part";
             if [ ! -f "$DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE" ];
             then
-                echo "# This file will be inserted into section: server { location / { <inserted here> } }" > $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
+                echo "# This file will be inserted into section: server { location / { <inserted here> } }" > $DIR_CONF_D/$TEMPLATE_CONF_FILE;
+                cp -f $DIR_CONF_D/$TEMPLATE_CONF_FILE $DIR_CONF_D_TEMPLATES/$TEMPLATE_CONF_FILE$SUFFIX_TEMPLATE;
             fi
             echo "" >> $FILE_CONF;
             echo "        include                            $DIR_CONF_D/location-common.conf.part;" >> $FILE_CONF;
@@ -590,7 +599,7 @@ $LS $DIR_CONF_D_TEMPLATES/*.part$SUFFIX_TEMPLATE;
 printf "Tip: Use files $DIR_CONF_D_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF_D directory with replacement of environment variables with their values.\n";
 
 ls -1 ${DIR_CONF_D_TEMPLATES}/ | \
-    grep ${SUFFIX_TEMPLATE}$ | \
+    grep ^site-${SUFFIX_TEMPLATE}$ | \
     xargs -I {} echo ${DIR_CONF_D_TEMPLATES}/{} | \
     xargs -I {} sh -c '( test "" = "$(cat {} | grep -v ^# | grep -v ^\s*$)" && echo echo Ignoring empty template: {} && mv {} {}-isEmpty ) || echo ' | \
     sh;
