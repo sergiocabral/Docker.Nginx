@@ -463,6 +463,7 @@ do
                 SITE_LOCATION=${SITES_DIRECTORY[$INDEX_SITE]};
                 SITE_DIR_NAME=${URLS[0]}$( (test ! -z "$SITE_LOCATION" && echo "-$SITE_LOCATION") || echo "" );
                 SITE_LOCATION_PATH="$DIR_SITES/$SITE_DIR_NAME/$DIR_SITES_ROOT";
+                SITE_LOCATION_SLASH=$( echo /$SITE_LOCATION/ | sed 's/\/\//\//' );
 
                 echo "" >> $FILE_CONF;
                 echo "    location /$SITE_LOCATION {" >> $FILE_CONF;
@@ -485,7 +486,7 @@ do
                 if [ ! -z "${SITES_FEATURE_WORDPRESS[$INDEX_SITE]}" ];
                 then
                     echo "        if (!-e \$request_filename) {" >> $FILE_CONF;
-                    echo "            rewrite ^/(.*)$ /index.php?\$1;" >> $FILE_CONF;
+                    echo "            rewrite ^/(.*)$ ${SITE_LOCATION_SLASH}index.php?\$1;" >> $FILE_CONF;
                     echo "        }" >> $FILE_CONF;
                     echo "" >> $FILE_CONF;
                 fi
