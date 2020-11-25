@@ -198,30 +198,38 @@ do
     SERVER_NAME=${SERVER_PARTS[0]};
     SERVER_PORT=${SERVER_PARTS[1]};    
 
-    CAN_CONFIGURE=true;
-
-    if [ -z "$SERVER_NAME" ] || [ -z "$SERVER_PORT" ];
+    if [ ! -z "$SERVER_NAME" ] && [ ! -z "$SERVER_PORT" ];
     then
-        readarray -t SITES < <($DIR_SCRIPTS/split-to-lines.sh "," "$SERVER,");
+        CAN_CONFIGURE=true;
+    else
+        if [ ! -z "$SERVER" ];
+        then
+            CAN_CONFIGURE=true;
 
-        SITE_REGEX="^[a-zA-Z0-9\.-_]+(|/php[57]|/wordpress)$";
-        for SITE in ${SITES[@]};
-        do
-            if [ ! -z "$SITE" ] && [[ ! "${SITE}" =~ ${SITE_REGEX} ]];
-            then
-                printf "INVALID SITE VALUE: $SITE\n";
-                CAN_CONFIGURE=false;
-                break;
-            fi
-        done
+            readarray -t SITES < <($DIR_SCRIPTS/split-to-lines.sh "," "$SERVER,");
+
+            SITE_REGEX="^[a-zA-Z0-9\.-_]+(|/php[057]|/wordpress)$";
+            for SITE in ${SITES[@]};
+            do
+                if [ ! -z "$SITE" ] && [[ ! "${SITE}" =~ ${SITE_REGEX} ]];
+                then
+                    printf "INVALID SITE VALUE: $SITE\n";
+                    CAN_CONFIGURE=false;
+                    break;
+                fi
+            done
+        else
+            CAN_CONFIGURE=false;
+        fi
     fi
 
     if [ "$CAN_CONFIGURE" = false ];
     then
         printf "The directory name or address and port of the service was not informed.\n";
-        printf "For directory name you can use PHP version as \"/php5\" or \"/php7\" (default).\n";
+        printf "For directory name you can use PHP version as \"/php5\" or \"/php7\" (default) or \"/php0\" to disable it.\n";
+        printf "Use \"/wordpress\" to configure for it..\n";
         printf "Set variable to one of the two below:\n";
-        printf "  HOST${INDEX_HOST}_LOCATION=<directory1>/php5,<directory2>/php7,<directory3>,<directory4>\n";
+        printf "  HOST${INDEX_HOST}_LOCATION=<directory1>/php0,<directory2>/php5,<directory3>/php7/wordpress,<directory4>\n";
         printf "  HOST${INDEX_HOST}_LOCATION=<server name>:<port number>\n";
     fi
 
@@ -253,11 +261,14 @@ do
 
                 SITES_DIRECTORY[$INDEX_SITE]=${SITE_PARTS[0]};
 
+                SITES_FEATURE_PHP[$INDEX_SITE]="php7";
+                if [[ "$SITE" =~ "/php0" ]];
+                then
+                    SITES_FEATURE_PHP[$INDEX_SITE]="php0";
+                fi
                 if [[ "$SITE" =~ "/php5" ]];
                 then
                     SITES_FEATURE_PHP[$INDEX_SITE]="php5";
-                else
-                    SITES_FEATURE_PHP[$INDEX_SITE]="php7";
                 fi
 
                 if [[ "$SITE" =~ "/wordpress" ]];
@@ -455,7 +466,12 @@ do
                 echo "" >> $FILE_CONF;
             fi
 
-            echo "    index                                  index.php index.html index.htm;" >> $FILE_CONF;
+            if [ "${SITES_FEATURE_PHP[$INDEX_SITE]}" == "php0" ];
+            then
+                echo "    index                                  index.html index.htm;" >> $FILE_CONF;
+            else
+                echo "    index                                  index.html index.htm index.php;" >> $FILE_CONF;
+            fi
 
             INDEX_SITE=0;
             for SITE in ${SITES[@]};
@@ -491,14 +507,17 @@ do
                     echo "" >> $FILE_CONF;
                 fi
 
-                echo "        location ~ [^/]\.php(/|\$) {" >> $FILE_CONF;
-                echo "            fastcgi_split_path_info        ^(.+?\.php)(/.*)\$;" >> $FILE_CONF;
-                echo "            fastcgi_pass                   ${SITES_FEATURE_PHP[$INDEX_SITE]}:9000;" >> $FILE_CONF;
-                echo "            fastcgi_index                  index.php;" >> $FILE_CONF;
-                echo "            include                        fastcgi_params;" >> $FILE_CONF;
-                echo "            fastcgi_param                  SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
-                echo "            fastcgi_intercept_errors       on;" >> $FILE_CONF;
-                echo "        }" >> $FILE_CONF;
+                if [ "${SITES_FEATURE_PHP[$INDEX_SITE]}" != "php0" ];
+                then
+                    echo "        location ~ [^/]\.php(/|\$) {" >> $FILE_CONF;
+                    echo "            fastcgi_split_path_info        ^(.+?\.php)(/.*)\$;" >> $FILE_CONF;
+                    echo "            fastcgi_pass                   ${SITES_FEATURE_PHP[$INDEX_SITE]}:9000;" >> $FILE_CONF;
+                    echo "            fastcgi_index                  index.php;" >> $FILE_CONF;
+                    echo "            include                        fastcgi_params;" >> $FILE_CONF;
+                    echo "            fastcgi_param                  SCRIPT_FILENAME \$request_filename;" >> $FILE_CONF;
+                    echo "            fastcgi_intercept_errors       on;" >> $FILE_CONF;
+                    echo "        }" >> $FILE_CONF;
+                fi
 
                 echo "    }" >> $FILE_CONF;
 
