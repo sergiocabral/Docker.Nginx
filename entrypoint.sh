@@ -208,7 +208,7 @@ do
 
             readarray -t SITES < <($DIR_SCRIPTS/split-to-lines.sh "," "$SERVER,");
 
-            SITE_REGEX="^[a-zA-Z0-9\.-_]+(|/php[057]|/wordpress)$";
+            SITE_REGEX="^[a-zA-Z0-9\.-_]+(|/php[0578]|/wordpress)$";
             for SITE in ${SITES[@]};
             do
                 if [ ! -z "$SITE" ] && [[ ! "${SITE}" =~ ${SITE_REGEX} ]];
@@ -226,10 +226,10 @@ do
     if [ "$CAN_CONFIGURE" = false ];
     then
         printf "The directory name or address and port of the service was not informed.\n";
-        printf "For directory name you can use PHP version as \"/php5\" or \"/php7\" (default) or \"/php0\" to disable it.\n";
+        printf "For directory name you can use PHP version as \"/php5\", \"/php7\" or \"/php8\" (default) or \"/php0\" to disable it.\n";
         printf "Use \"/wordpress\" to configure for it..\n";
         printf "Set variable to one of the two below:\n";
-        printf "  HOST${INDEX_HOST}_LOCATION=<directory1>/php0,<directory2>/php5,<directory3>/php7/wordpress,<directory4>\n";
+        printf "  HOST${INDEX_HOST}_LOCATION=<directory1>/php0,<directory2>/php5,<directory3>/php8/wordpress,<directory4>\n";
         printf "  HOST${INDEX_HOST}_LOCATION=<server name>:<port number>\n";
     fi
 
@@ -261,7 +261,7 @@ do
 
                 SITES_DIRECTORY[$INDEX_SITE]=${SITE_PARTS[0]};
 
-                SITES_FEATURE_PHP[$INDEX_SITE]="php7";
+                SITES_FEATURE_PHP[$INDEX_SITE]="php8";
                 if [[ "$SITE" =~ "/php0" ]];
                 then
                     SITES_FEATURE_PHP[$INDEX_SITE]="php0";
@@ -269,6 +269,10 @@ do
                 if [[ "$SITE" =~ "/php5" ]];
                 then
                     SITES_FEATURE_PHP[$INDEX_SITE]="php5";
+                fi
+                if [[ "$SITE" =~ "/php7" ]];
+                then
+                    SITES_FEATURE_PHP[$INDEX_SITE]="php7";
                 fi
 
                 if [[ "$SITE" =~ "/wordpress" ]];

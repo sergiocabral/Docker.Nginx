@@ -21,16 +21,16 @@ If you want, configure a website or reverse proxy of your services using only en
 - You can enter one or more separated by space.
 - Each url entered here is linked to the SSL certificate, if it is generated.
 
-`HOST1_LOCATION` = `10.0.0.10:5555` or `website-directory/php7`
+`HOST1_LOCATION` = `10.0.0.10:5555` or `website-directory/php8`
 
 - Mandatory value.
 - For reverse proxy use:
   - Service access name, either hostname or IP.
   - It is mandatory to inform the port (after the colon) of the service, which in turn will be exposed as an HTTP or HTTPS port.
 - For website use:
-  - Use empty directory name with PHP version as `/php5` or `/php7`.
+  - Use empty directory name with PHP version as `/php5`, `/php7` or `/php8`.
   - Use directory name with characters set `a-z`, `0-9`, `-`, `.` to set sub-sites.
-  - Example to value of `HOST1_LOCATION` with main website with PHP5 and subsite1 with default PHP version and subsite2 with PHP7: `/php5,subsite1,subsite2/php7`.
+  - Example to value of `HOST1_LOCATION` with main website with PHP5 and subsite1 with default PHP version and subsite2 with PHP8: `/php5,subsite1,subsite2/php8`.
 
 `HOST1_AUTH` = `username1=password1,username2=password2,username3=password3`
 
